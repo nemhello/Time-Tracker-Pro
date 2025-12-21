@@ -837,23 +837,42 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+async function checkAuthentication() {
+    if (!authToken) return false;
+    if (authExpiry && new Date(authExpiry) < new Date()) return false;
+    try {
+        const res = await fetch(`${CONFIG.apiUrl}/auth/validate`, {
+            method: 'POST', 
+            headers: {'Authorization': `Bearer ${authToken}`}
+        });
+        return res.ok;
+    } catch { 
+        return false; 
+    }
+}
+
 async function showLoginPrompt() {
     const pass = prompt('🔒 Password (Cancel=timer-only):');
     if (!pass) return false;
-    
     try {
-        console.log('Attempting login...');
         const res = await fetch(`${CONFIG.apiUrl}/auth/login`, {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify({password:pass})
         });
-        
-        if (!res.ok) {
-            console.log('Login failed:', res.status);
-            alert('❌ Invalid password');
-            return false;
-        }
+        if (!res.ok) return false;
+        const data = await res.json();
+        authToken = data.token;
+        const exp = new Date(); 
+        exp.setDate(exp.getDate() + 30);
+        authExpiry = exp.toISOString();
+        localStorage.setItem('authToken', authToken);
+        localStorage.setItem('authExpiry', authExpiry);
+        return true;
+    } catch { 
+        return false; 
+    }
+}
         
         const data = await res.json();
         console.log('Login successful, saving token...');
