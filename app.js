@@ -1,3 +1,8 @@
+const CONFIG = { apiUrl: 'https://api.wilkerson-labs.com' };
+let authToken = localStorage.getItem('authToken');
+let authExpiry = localStorage.getItem('authExpiry');
+let locationPhotos = {}, currentLocationPhotos = [], photoViewMode = false;
+
 // State
 let entries = [];
 let activeEntry = null;
@@ -8,7 +13,9 @@ let pendingCodeSelection = null;
 let currentCalendarDate = new Date();
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    const isAuth = await checkAuthentication();
+    if (!isAuth) await showLoginPrompt();
     if (typeof CATEGORIES === 'undefined') {
         console.error('CRITICAL: CATEGORIES not loaded!');
         alert('ERROR: Location data failed to load. Please refresh.');
@@ -28,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 100);
     
     loadEntries();
+    loadPhotos();
     renderCategories();
     renderEntries();
     updateCurrentDate();
@@ -46,6 +54,14 @@ function loadEntries() {
 
 function saveEntries() {
     localStorage.setItem('timeEntries', JSON.stringify(entries));
+}
+
+function loadPhotos() {
+    const stored = localStorage.getItem('locationPhotos');
+    locationPhotos = stored ? JSON.parse(stored) : {};
+}
+function savePhotos() {
+    localStorage.setItem('locationPhotos', JSON.stringify(locationPhotos));
 }
 
 function saveActiveEntry() {
@@ -820,3 +836,35 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+async function checkAuthentication() {
+    if (!authToken) return false;
+    if (authExpiry && new Date(authExpiry) < new Date()) return false;
+    try {
+        const res = await fetch(`${CONFIG.apiUrl}/auth/validate`, {
+            method: 'POST', headers: {'Authorization': `Bearer ${authToken}`}
+        });
+        return res.ok;
+    } catch { return false; }
+}
+
+async function showLoginPrompt() {
+    const pass = prompt('🔒 Password (Cancel=timer-only):');
+    if (!pass) return false;
+    try {
+        const res = await fetch(`${CONFIG.apiUrl}/auth/login`, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({password:pass})
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        authToken = data.token;
+        const exp = new Date(); exp.setDate(exp.getDate() + 30);
+        authExpiry = exp.toISOString();
+        localStorage.setItem('authToken', authToken);
+        localStorage.setItem('authExpiry', authExpiry);
+        return true;
+    } catch { return false; }
+}
+
