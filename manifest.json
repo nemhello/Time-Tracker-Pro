@@ -1,8 +1,8 @@
 {
-  "name": "Time Tracker",
-  "short_name": "TimeTracker",
+  "name": "Time Tracker Pro",
+  "short_name": "TimeTrackerPro",
   "version": "3.2",
-  "description": "Track time at different locations",
+  "description": "Time tracking with pohoto documentation for field work",
   "start_url": "/time-tracker/",
   "scope": "/time-tracker/",
   "display": "standalone",
