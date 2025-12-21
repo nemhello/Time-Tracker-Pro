@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1e40af"> 
+    <title>Time Tracker</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header>
+            <h1>⏱️ Time Tracker</h1>
+            <div id="currentDate"></div>
+        </header>
+
+        <!-- Active Timer Section -->
+        <div id="activeTimer" class="hidden">
+            <div class="active-card">
+                <div class="location-name" id="activeLocation"></div>
+                <div class="charge-code" id="activeChargeCode"></div>
+                <a id="activeAddress" class="active-address" href="#" target="_blank"></a>
+                <div class="timer-display" id="timerDisplay">00:00:00</div>
+                <input type="text" id="workOrderField" class="work-order-field" placeholder="Work Order # (optional)">
+                <textarea id="notesField" class="notes-field" placeholder="Add notes (optional)..."></textarea>
+                <button id="stopBtn" class="btn btn-danger">STOP</button>
+            </div>
+        </div>
+
+        <!-- Global Search -->
+        <div id="globalSearchSection">
+            <div class="search-header">
+                <button id="clearSearchBtn" class="btn-back hidden">← Back</button>
+                <input type="text" id="globalSearchBox" placeholder="Search all locations..." class="search-box">
+            </div>
+            <div id="globalSearchResults" class="location-list hidden"></div>
+        </div>
+
+        <!-- Category Selection -->
+        <div id="categorySelection">
+            <div id="categoryList" class="category-list"></div>
+        </div>
+
+        <!-- Location Selection -->
+        <div id="locationSelection" class="hidden">
+            <button id="backBtn" class="btn-back">← Back to Categories</button>
+            <div id="locationList" class="location-list"></div>
+        </div>
+
+        <!-- Location Details -->
+        <div id="locationDetails" class="hidden">
+            <button id="backFromDetailsBtn" class="btn-back">← Back</button>
+            <div class="details-card">
+                <div class="details-location" id="detailsLocation"></div>
+                <div class="details-code" id="detailsChargeCode"></div>
+                <div id="detailsAddress" class="details-address"></div>
+                <button id="emailStartBtn" class="btn btn-email">📧 Email Dispatch to Start</button>
+                <button id="startTimerBtn" class="btn btn-primary">▶ Start Timer</button>
+            </div>
+        </div>
+
+        <!-- Today's Entries -->
+        <div id="todaySection">
+            <h2>Today's Entries</h2>
+            <div id="entriesList"></div>
+            <div id="totalHours"></div>
+            <button id="viewPastBtn" class="btn btn-secondary">📅 View Past Entries</button>
+            <button id="exportDataBtn" class="btn btn-secondary">💾 Export Backup</button>
+            <button id="importDataBtn" class="btn btn-secondary">📂 Import Backup</button>
+        </div>
+        
+        <!-- Calendar/Past Entries View -->
+        <div id="calendarView" class="hidden">
+            <button id="backFromCalendarBtn" class="btn-back">← Back to Today</button>
+            <h2>Past Entries</h2>
+            <div id="calendarContainer"></div>
+            <div id="pastEntriesDetail" class="hidden">
+                <h3 id="selectedDateTitle"></h3>
+                <div id="selectedDateEntries"></div>
+            </div>
+        </div>
+        
+        <!-- Code Selection Modal -->
+        <div id="codeModal" class="modal hidden">
+            <div class="modal-content">
+                <h3>Which code to use?</h3>
+                <button id="useSZCode" class="btn btn-primary code-btn">
+                    <div class="code-label">SZ Code</div>
+                    <div class="code-value" id="szCodeValue"></div>
+                </button>
+                <button id="useMOSCode" class="btn btn-primary code-btn">
+                    <div class="code-label">MOS Code</div>
+                    <div class="code-value" id="mosCodeValue"></div>
+                </button>
+                <button id="skipEmailBtn" class="btn btn-secondary" style="margin-top: 8px;">Skip Email & Finish</button>
+                <button id="cancelCodeModal" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+        
+        <!-- Version -->
+        <div class="version">v3.3</div>
+    </div>
+
+    <script src="locations.js"></script>
+    <script src="app.js"></script>
+    <script>
+        // Register service worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js');
+        }
+    </script>
+</body>
+</html>

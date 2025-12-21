@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Search</title>
+</head>
+<body>
+    <h1>Search Test</h1>
+    <input type="text" id="searchBox" placeholder="Type here...">
+    <div id="results"></div>
+    <div id="debug"></div>
+    
+    <script src="locations.js"></script>
+    <script>
+        const debugDiv = document.getElementById('debug');
+        
+        // Check if CATEGORIES loaded
+        debugDiv.innerHTML = '<h2>Debug Info:</h2>';
+        debugDiv.innerHTML += '<p>CATEGORIES exists: ' + (typeof CATEGORIES !== 'undefined') + '</p>';
+        
+        if (typeof CATEGORIES !== 'undefined') {
+            debugDiv.innerHTML += '<p>CATEGORIES is object: ' + (typeof CATEGORIES === 'object') + '</p>';
+            debugDiv.innerHTML += '<p>Number of categories: ' + Object.keys(CATEGORIES).length + '</p>';
+            debugDiv.innerHTML += '<p>Categories: ' + Object.keys(CATEGORIES).join(', ') + '</p>';
+            
+            // Test search
+            document.getElementById('searchBox').addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                const resultsDiv = document.getElementById('results');
+                
+                if (!term) {
+                    resultsDiv.innerHTML = '';
+                    return;
+                }
+                
+                let found = [];
+                for (const [catName, locations] of Object.entries(CATEGORIES)) {
+                    const matches = locations.filter(loc => 
+                        loc.name.toLowerCase().includes(term) ||
+                        loc.chargeCode.toLowerCase().includes(term)
+                    );
+                    matches.forEach(loc => found.push({...loc, category: catName}));
+                }
+                
+                resultsDiv.innerHTML = '<h3>Found ' + found.length + ' results:</h3>';
+                found.forEach(loc => {
+                    resultsDiv.innerHTML += '<div>' + loc.name + ' (' + loc.chargeCode + ') - ' + loc.category + '</div>';
+                });
+            });
+        } else {
+            debugDiv.innerHTML += '<p style="color: red;">ERROR: CATEGORIES not loaded!</p>';
+        }
+    </script>
+</body>
+</html>
