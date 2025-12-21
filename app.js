@@ -837,34 +837,60 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-async function checkAuthentication() {
-    if (!authToken) return false;
-    if (authExpiry && new Date(authExpiry) < new Date()) return false;
-    try {
-        const res = await fetch(`${CONFIG.apiUrl}/auth/validate`, {
-            method: 'POST', headers: {'Authorization': `Bearer ${authToken}`}
-        });
-        return res.ok;
-    } catch { return false; }
-}
-
 async function showLoginPrompt() {
     const pass = prompt('🔒 Password (Cancel=timer-only):');
     if (!pass) return false;
+    
     try {
+        console.log('Attempting login...');
         const res = await fetch(`${CONFIG.apiUrl}/auth/login`, {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify({password:pass})
         });
-        if (!res.ok) return false;
+        
+        if (!res.ok) {
+            console.log('Login failed:', res.status);
+            alert('❌ Invalid password');
+            return false;
+        }
+        
         const data = await res.json();
+        console.log('Login successful, saving token...');
+        
+        // Save token
         authToken = data.token;
-        const exp = new Date(); exp.setDate(exp.getDate() + 30);
+        const exp = new Date(); 
+        exp.setDate(exp.getDate() + 30);
         authExpiry = exp.toISOString();
-        localStorage.setItem('authToken', authToken);
-        localStorage.setItem('authExpiry', authExpiry);
-        return true;
-    } catch { return false; }
+        
+        // Try to save
+        try {
+            localStorage.setItem('authToken', authToken);
+            localStorage.setItem('authExpiry', authExpiry);
+            console.log('Token saved to localStorage');
+            
+            // Verify it saved
+            const saved = localStorage.getItem('authToken');
+            if (saved) {
+                console.log('✅ Token verified in localStorage');
+                alert('✅ Login successful!');
+                return true;
+            } else {
+                console.log('❌ Token did NOT save to localStorage');
+                alert('⚠️ Login successful but token cannot be saved.\n\nYou may need to login each time.');
+                return true; // Still allow usage
+            }
+        } catch (storageError) {
+            console.error('localStorage error:', storageError);
+            alert('⚠️ Cannot save login token.\n\nStorage may be disabled.');
+            return true; // Still allow usage
+        }
+        
+    } catch (error) {
+        console.error('Login error:', error);
+        alert('❌ Login failed');
+        return false;
+    }
 }
 
