@@ -519,7 +519,7 @@ header h1 {
     color: #1d1d1f;
 }
 
-/* Buttons - LARGER SIZE */
+/* Buttons - LARGER SIZE + FIXED COLORS */
 .btn {
     padding: 18px 28px;
     font-size: 18px;
@@ -547,13 +547,23 @@ header h1 {
 }
 
 .btn-secondary {
-    background: #6b7280;
+    background: #3b82f6;
     color: white;
-    box-shadow: 0 2px 8px rgba(107, 114, 128, 0.3);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 .btn-secondary:active {
-    background: #4b5563;
+    background: #2563eb;
+}
+
+.btn-email {
+    background: #10b981;
+    color: white;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.btn-email:active {
+    background: #059669;
 }
 
 .btn-primary {

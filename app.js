@@ -253,7 +253,7 @@ function renderLocationDetailsView() {
         }
         
         html += `
-            <button class="btn btn-secondary" onclick="emailDispatchStart()">📧 Email Dispatch</button>
+            <button class="btn btn-email" onclick="emailDispatchStart()">📧 Email Dispatch</button>
             <button class="btn btn-primary" onclick="confirmStartTimer()">▶️ Start Timer</button>
         `;
         
@@ -464,7 +464,7 @@ async function handlePhotoFile(event) {
     event.target.value = '';
 }
 
-// Photo Upload - FIXED: Use correct URL format
+// Photo Upload - FIXED: Use backend proxy URL
 async function uploadPhoto(photoBlob) {
     if (!authToken) {
         alert('❌ Authentication required for photo upload.');
@@ -490,12 +490,13 @@ async function uploadPhoto(photoBlob) {
         }
         
         const result = await response.json();
+        console.log('Upload result:', result);
         
         const photoData = {
             id: Date.now().toString(),
             storage: result.storage,
             assetId: result.assetId || result.cloudinaryId,
-            url: result.url || result.thumbnail,
+            url: result.url,  // Backend now returns proxied URL
             fullUrl: result.fullUrl || result.url,
             timestamp: result.timestamp || new Date().toISOString(),
             location: selectedLocation.name,
