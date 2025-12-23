@@ -1,4 +1,4 @@
-const CONFIG = { apiUrl: 'https://api.wilkerson-labs.com' };
+const CONFIG = { apiUrl: 'https://field-api.wilkerson-labs.com' };
 let authToken = localStorage.getItem('authToken');
 let authExpiry = localStorage.getItem('authExpiry');
 let locationPhotos = {}, currentLocationPhotos = [], photoViewMode = false;
