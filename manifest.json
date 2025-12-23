@@ -1,13 +1,13 @@
 {
   "name": "Time Tracker Pro",
   "short_name": "TimeTrackerPro",
-  "version": "3.2",
-  "description": "Time tracking with pohoto documentation for field work",
-  "start_url": "/time-tracker/",
-  "scope": "/time-tracker/",
+  "version": "4.0",
+  "description": "Time tracking with photo documentation for field work",
+  "start_url": "/time-tracker-pro/",
+  "scope": "/time-tracker-pro/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#007aff",
+  "theme_color": "#1e40af",
   "orientation": "portrait",
   "icons": [
     {
