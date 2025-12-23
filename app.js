@@ -1062,8 +1062,7 @@ function setupEventListeners() {
     document.getElementById('backFromDetailsBtn').addEventListener('click', backFromDetails);
     document.getElementById('backFromCalendarBtn').addEventListener('click', hideCalendar);
     
-    document.getElementById('emailStartBtn').addEventListener('click', emailDispatchStart);
-    document.getElementById('startTimerBtn').addEventListener('click', confirmStartTimer);
+    // emailStartBtn and startTimerBtn now use inline onclick handlers (dynamically created)
     document.getElementById('stopBtn').addEventListener('click', stopTimer);
     
     document.getElementById('viewPastBtn').addEventListener('click', showCalendar);
