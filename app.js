@@ -242,20 +242,20 @@ function renderLocationDetailsView() {
     if (buttonsDiv) {
         let html = '';
         
+        if (lastVisit && photoCount > 0) {
+            html += `<div class="photo-info-banner">Last visit: ${lastVisit} • ${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>`;
+        }
+        
         if (authToken && photoCount > 0) {
-            html += `<button class="btn-primary" onclick="togglePhotoView()">📸 View Photos (${photoCount})</button>`;
+            html += `<button class="btn btn-primary" onclick="togglePhotoView()">📸 View Photos (${photoCount})</button>`;
         } else if (authToken) {
-            html += `<button class="btn-primary" onclick="togglePhotoView()">📷 Add Photos</button>`;
+            html += `<button class="btn btn-primary" onclick="togglePhotoView()">📷 Add Photos</button>`;
         }
         
         html += `
-            <button class="btn-secondary" onclick="emailDispatchStart()">📧 Email Dispatch</button>
-            <button class="btn-primary" onclick="confirmStartTimer()">▶️ Start Timer</button>
+            <button class="btn btn-secondary" onclick="emailDispatchStart()">📧 Email Dispatch</button>
+            <button class="btn btn-primary" onclick="confirmStartTimer()">▶️ Start Timer</button>
         `;
-        
-        if (lastVisit && photoCount > 0) {
-            html = `<div class="photo-info-banner">Last visit: ${lastVisit} • ${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>` + html;
-        }
         
         buttonsDiv.innerHTML = html;
     }
@@ -332,11 +332,11 @@ function showPhotoGallery() {
         </div>
         
         <div class="photo-capture-section">
-            <button class="btn-primary btn-capture" onclick="capturePhoto()">
+            <button class="btn btn-primary btn-capture" onclick="capturePhoto()">
                 📷 Take Photo
             </button>
             <input type="file" id="photoFileInput" accept="image/*" style="display: none;" onchange="handlePhotoFile(event)">
-            <button class="btn-secondary" onclick="document.getElementById('photoFileInput').click()">
+            <button class="btn btn-secondary" onclick="document.getElementById('photoFileInput').click()">
                 📁 Upload Photo
             </button>
         </div>
@@ -346,7 +346,7 @@ function showPhotoGallery() {
         </div>
         
         <div class="details-buttons">
-            <button class="btn-secondary" onclick="togglePhotoView()">⏱️ Back to Timer</button>
+            <button class="btn btn-secondary" onclick="togglePhotoView()">⏱️ Back to Timer</button>
         </div>
     `;
 }
@@ -358,7 +358,7 @@ function renderPhotoGrid() {
     
     return currentLocationPhotos.map((photo, index) => `
         <div class="photo-card" onclick="viewFullPhoto(${index})">
-            <img src="${photo.url}" alt="Photo ${index + 1}" loading="lazy">
+            <img src="${photo.url}" alt="Photo ${index + 1}" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23ddd%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22%3EImage Error%3C/text%3E%3C/svg%3E'">
             <div class="photo-overlay">
                 <div class="photo-date">${formatPhotoDate(photo.timestamp)}</div>
                 ${photo.storage === 'immich' ? '🏠' : photo.storage === 'cloudinary' ? '☁️' : '📱'}
@@ -406,8 +406,8 @@ async function capturePhoto() {
             <div class="camera-container">
                 <div class="camera-preview"></div>
                 <div class="camera-controls">
-                    <button class="btn-secondary" id="cancelCapture">Cancel</button>
-                    <button class="btn-primary" id="captureButton">📷 Capture</button>
+                    <button class="btn btn-secondary" id="cancelCapture">Cancel</button>
+                    <button class="btn btn-primary" id="captureButton">📷 Capture</button>
                 </div>
             </div>
         `;
@@ -464,7 +464,7 @@ async function handlePhotoFile(event) {
     event.target.value = '';
 }
 
-// Photo Upload
+// Photo Upload - FIXED: Use correct URL format
 async function uploadPhoto(photoBlob) {
     if (!authToken) {
         alert('❌ Authentication required for photo upload.');
@@ -495,7 +495,7 @@ async function uploadPhoto(photoBlob) {
             id: Date.now().toString(),
             storage: result.storage,
             assetId: result.assetId || result.cloudinaryId,
-            url: getProxiedImageUrl(result),
+            url: result.url || result.thumbnail,
             fullUrl: result.fullUrl || result.url,
             timestamp: result.timestamp || new Date().toISOString(),
             location: selectedLocation.name,
@@ -509,6 +509,8 @@ async function uploadPhoto(photoBlob) {
         
         if (photoViewMode) {
             showPhotoGallery();
+        } else if (activeEntry) {
+            updateTimerPhotoSection();
         }
         
         alert(`✅ Photo uploaded to ${result.storage}!`);
@@ -517,14 +519,6 @@ async function uploadPhoto(photoBlob) {
         console.error('Upload failed:', error);
         hideLoadingIndicator();
         alert('❌ Photo upload failed.\n\n' + error.message);
-    }
-}
-
-function getProxiedImageUrl(result) {
-    if (result.storage === 'immich' && result.assetId) {
-        return `${CONFIG.apiUrl}/api/immich/assets/${result.assetId}/thumbnail`;
-    } else {
-        return result.url;
     }
 }
 
@@ -564,7 +558,7 @@ function viewFullPhoto(index) {
                 <button onclick="closePhotoViewer()">✕ Close</button>
                 <div class="photo-info">${index + 1} / ${currentLocationPhotos.length}</div>
             </div>
-            <img src="${photo.fullUrl || photo.url}" alt="Photo">
+            <img src="${photo.fullUrl || photo.url}" alt="Photo" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22400%22%3E%3Crect fill=%22%23222%22 width=%22400%22 height=%22400%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22 font-size=%2220%22%3EImage Failed to Load%3C/text%3E%3C/svg%3E'">
             <div class="photo-viewer-footer">
                 <div>${selectedLocation.name}</div>
                 <div>${new Date(photo.timestamp).toLocaleString()}</div>
@@ -599,6 +593,8 @@ function deletePhoto(index) {
     
     if (photoViewMode) {
         showPhotoGallery();
+    } else if (activeEntry) {
+        updateTimerPhotoSection();
     }
     
     alert('✓ Photo deleted');
@@ -663,7 +659,7 @@ function sendStopEmail(code) {
     window.location.href = `mailto:dispatch@motorolasolutions.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-// Timer
+// Timer - WITH PHOTO SECTION
 function confirmStartTimer() {
     if (!selectedLocation) return;
     
@@ -712,6 +708,80 @@ function showActiveTimer() {
     
     document.getElementById('workOrderField').value = activeEntry.workOrder || '';
     document.getElementById('notesField').value = activeEntry.notes || '';
+    
+    // Add photo section to timer
+    updateTimerPhotoSection();
+}
+
+function updateTimerPhotoSection() {
+    if (!activeEntry) return;
+    
+    currentLocationPhotos = getLocationPhotos(activeEntry.location);
+    const photoCount = currentLocationPhotos.length;
+    
+    let photoSection = document.getElementById('timerPhotoSection');
+    if (!photoSection) {
+        photoSection = document.createElement('div');
+        photoSection.id = 'timerPhotoSection';
+        photoSection.className = 'timer-photo-section';
+        
+        const stopBtn = document.getElementById('stopBtn');
+        stopBtn.parentNode.insertBefore(photoSection, stopBtn);
+    }
+    
+    if (authToken) {
+        photoSection.innerHTML = `
+            <div class="timer-photo-buttons">
+                <button class="btn btn-primary" onclick="capturePhotoFromTimer()">📷 Take Photo</button>
+                ${photoCount > 0 ? `<button class="btn btn-secondary" onclick="viewPhotosFromTimer()">📸 View Photos (${photoCount})</button>` : ''}
+            </div>
+        `;
+    } else {
+        photoSection.innerHTML = '';
+    }
+}
+
+function capturePhotoFromTimer() {
+    selectedLocation = {
+        name: activeEntry.location,
+        chargeCodeSZ: activeEntry.chargeCodeSZ,
+        chargeCodeMOS: activeEntry.chargeCodeMOS,
+        address: activeEntry.address
+    };
+    capturePhoto();
+}
+
+function viewPhotosFromTimer() {
+    selectedLocation = {
+        name: activeEntry.location,
+        chargeCodeSZ: activeEntry.chargeCodeSZ,
+        chargeCodeMOS: activeEntry.chargeCodeMOS,
+        address: activeEntry.address
+    };
+    currentLocationPhotos = getLocationPhotos(activeEntry.location);
+    
+    // Show modal with photos
+    const modal = document.createElement('div');
+    modal.className = 'photo-modal-overlay';
+    modal.innerHTML = `
+        <div class="photo-modal">
+            <div class="photo-modal-header">
+                <h2>📸 ${activeEntry.location} Photos</h2>
+                <button onclick="closePhotoModal()">✕ Close</button>
+            </div>
+            <div class="photo-gallery" style="max-height: 60vh; overflow-y: auto;">
+                ${renderPhotoGrid()}
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function closePhotoModal() {
+    const modal = document.querySelector('.photo-modal-overlay');
+    if (modal) {
+        document.body.removeChild(modal);
+    }
 }
 
 function startTimer() {
