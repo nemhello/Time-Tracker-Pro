@@ -9,7 +9,7 @@
     <title>Time Tracker Pro</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="styles.css">
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon192.png">
 </head>
 <body>
     <div id="app">
@@ -59,8 +59,9 @@
                 <div class="details-location" id="detailsLocation"></div>
                 <div class="details-code" id="detailsChargeCode"></div>
                 <div id="detailsAddress" class="details-address"></div>
-                <button id="emailStartBtn" class="btn btn-email">📧 Email Dispatch to Start</button>
-                <button id="startTimerBtn" class="btn btn-primary">▶ Start Timer</button>
+                <div class="details-buttons">
+                    <!-- Photo and timer buttons inserted here by renderLocationDetailsView() -->
+                </div>
             </div>
         </div>
 
@@ -96,23 +97,3 @@
                 <button id="useMOSCode" class="btn btn-primary code-btn">
                     <div class="code-label">MOS Code</div>
                     <div class="code-value" id="mosCodeValue"></div>
-                </button>
-                <button id="skipEmailBtn" class="btn btn-secondary" style="margin-top: 8px;">Skip Email & Finish</button>
-                <button id="cancelCodeModal" class="btn btn-secondary">Cancel</button>
-            </div>
-        </div>
-        
-        <!-- Version -->
-        <div class="version">v3.3</div>
-    </div>
-
-    <script src="locations.js"></script>
-    <script src="app.js"></script>
-    <script>
-        // Register service worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js');
-        }
-    </script>
-</body>
-</html>
