@@ -1,11 +1,11 @@
 const CACHE_NAME = 'time-tracker-pro-v4.0';
 const urlsToCache = [
-  '/time-tracker-pro/',
-  '/time-tracker-pro/index.html',
-  '/time-tracker-pro/styles.css',
-  '/time-tracker-pro/app.js',
-  '/time-tracker-pro/locations.js',
-  '/time-tracker-pro/manifest.json'
+  '/Time-Tracker-Pro/',
+  '/Time-Tracker-Pro/index.html',
+  '/Time-Tracker-Pro/styles.css',
+  '/Time-Tracker-Pro/app.js',
+  '/Time-Tracker-Pro/locations.js',
+  '/Time-Tracker-Pro/manifest.json'
 ];
 
 self.addEventListener('install', event => {
