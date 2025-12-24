@@ -329,22 +329,39 @@ function togglePhotoView() {
         
         // Track where we're coming from
         photoViewContext = activeEntry ? 'timer' : 'details';
+        
+        // If coming from timer, need to show locationDetails first
+        if (photoViewContext === 'timer') {
+            document.getElementById('activeTimer').classList.add('hidden');
+            document.getElementById('locationDetails').classList.remove('hidden');
+        }
+        
         showPhotoGallery();
     } else {
         // Clear photos from memory FIRST
         currentLocationPhotos = [];
         
-        // Return to where we came from - SIMPLE hide/show
+        // Return to where we came from
         if (photoViewContext === 'timer' && activeEntry) {
-            // Just hide details, show timer (fast!)
-            document.getElementById('locationDetails').classList.add('hidden');
-            document.getElementById('activeTimer').classList.remove('hidden');
+            // Going back to timer - force clean state
+            const locationDetails = document.getElementById('locationDetails');
+            const activeTimer = document.getElementById('activeTimer');
+            
+            // Reset location details
+            locationDetails.classList.add('hidden');
+            
+            // Show timer
+            activeTimer.classList.remove('hidden');
+            
+            // Reset selected location
+            selectedLocation = null;
         } else {
             // Rebuild location details view
             renderLocationDetailsView();
         }
         
         photoViewContext = null;
+        photoViewMode = false;
     }
 }
 
@@ -848,7 +865,8 @@ function closePhotoModal() {
     if (modal) {
         document.body.removeChild(modal);
     }
-    // Clear selectedLocation so app doesn't get stuck
+    // Clear state completely
+    currentLocationPhotos = [];
     selectedLocation = null;
 }
 
