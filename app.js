@@ -11,6 +11,7 @@ let selectedCategory = null;
 let selectedLocation = null;
 let pendingCodeSelection = null;
 let currentCalendarDate = new Date();
+let photoViewContext = null; // Track if viewing from 'timer' or 'details'
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -315,9 +316,20 @@ function togglePhotoView() {
     photoViewMode = !photoViewMode;
     
     if (photoViewMode) {
+        // Track where we're coming from
+        photoViewContext = activeEntry ? 'timer' : 'details';
         showPhotoGallery();
     } else {
-        renderLocationDetailsView();
+        // Return to where we came from
+        if (photoViewContext === 'timer' && activeEntry) {
+            // Coming from active timer - hide details, show timer
+            document.getElementById('locationDetails').classList.add('hidden');
+            document.getElementById('activeTimer').classList.remove('hidden');
+        } else {
+            // Coming from location details - rebuild details view
+            renderLocationDetailsView();
+        }
+        photoViewContext = null;
     }
 }
 
@@ -329,6 +341,8 @@ function showPhotoGallery() {
     
     const detailsCard = document.querySelector('#locationDetails .details-card');
     if (!detailsCard) return;
+    
+    const buttonText = photoViewContext === 'timer' ? '⏱️ Back to Timer' : '⬅️ Back';
     
     detailsCard.innerHTML = `
         <div class="photo-gallery-header">
@@ -347,13 +361,21 @@ function showPhotoGallery() {
         </div>
         
         <div class="photo-gallery" id="photoGalleryGrid">
-            ${renderPhotoGrid()}
+            ${currentLocationPhotos.length > 0 ? '<div class="loading-photos">⏳ Loading...</div>' : '<div class="no-photos">No photos yet. Take your first photo!</div>'}
         </div>
         
         <div class="details-buttons">
-            <button class="btn btn-secondary" onclick="togglePhotoView()">⬅️ Back to Location</button>
+            <button class="btn btn-secondary" onclick="togglePhotoView()">${buttonText}</button>
         </div>
     `;
+    
+    // Load photos after slight delay to show loading state
+    if (currentLocationPhotos.length > 0) {
+        setTimeout(() => {
+            const grid = document.getElementById('photoGalleryGrid');
+            if (grid) grid.innerHTML = renderPhotoGrid();
+        }, 50);
+    }
 }
 
 function renderPhotoGrid() {
@@ -363,7 +385,16 @@ function renderPhotoGrid() {
     
     return currentLocationPhotos.map((photo, index) => `
         <div class="photo-card" onclick="viewFullPhoto(${index})">
-            <img src="${photo.url}" alt="Photo ${index + 1}" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23ddd%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22%3EImage Error%3C/text%3E%3C/svg%3E'">
+            <div class="photo-spinner-placeholder">
+                <div class="spinner-small"></div>
+            </div>
+            <img 
+                src="${photo.url}" 
+                alt="Photo ${index + 1}" 
+                loading="lazy"
+                onload="this.style.opacity='1'; this.previousElementSibling.style.display='none';"
+                onerror="this.previousElementSibling.innerHTML='❌ Error'; this.style.display='none';"
+                style="opacity: 0; transition: opacity 0.3s;">
             <div class="photo-overlay">
                 <div class="photo-date">${formatPhotoDate(photo.timestamp)}</div>
                 ${photo.storage === 'immich' ? '🏠' : photo.storage === 'cloudinary' ? '☁️' : '📱'}

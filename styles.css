@@ -519,7 +519,7 @@ header h1 {
     color: #1d1d1f;
 }
 
-/* Buttons - LARGER SIZE + FIXED COLORS */
+/* Buttons - LARGER SIZE */
 .btn {
     padding: 18px 28px;
     font-size: 18px;
@@ -547,23 +547,13 @@ header h1 {
 }
 
 .btn-secondary {
-    background: #3b82f6;
+    background: #6b7280;
     color: white;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    box-shadow: 0 2px 8px rgba(107, 114, 128, 0.3);
 }
 
 .btn-secondary:active {
-    background: #2563eb;
-}
-
-.btn-email {
-    background: #10b981;
-    color: white;
-    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-}
-
-.btn-email:active {
-    background: #059669;
+    background: #4b5563;
 }
 
 .btn-primary {
@@ -1101,6 +1091,36 @@ header h1 {
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+/* Photo Loading States */
+.loading-photos {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px 20px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 16px;
+}
+
+.photo-spinner-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.spinner-small {
+    width: 30px;
+    height: 30px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
 }
 
 /* Mobile Responsive */
