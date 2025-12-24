@@ -399,9 +399,9 @@ function showPhotoGallery() {
                 <button class="btn btn-primary btn-capture" onclick="capturePhoto()">
                     📷 Take Photo
                 </button>
-                <input type="file" id="photoFileInput" accept="image/*" style="display: none;" onchange="handlePhotoFile(event)">
+                <input type="file" id="photoFileInput" accept="image/*" multiple style="display: none;" onchange="handlePhotoFile(event)">
                 <button class="btn btn-secondary" onclick="document.getElementById('photoFileInput').click()">
-                    📁 Upload Photo
+                    📁 Upload Photos
                 </button>
             </div>
             
@@ -534,26 +534,78 @@ async function capturePhoto() {
 }
 
 async function handlePhotoFile(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+    const files = Array.from(event.target.files);
+    if (!files || files.length === 0) return;
     
-    if (!file.type.startsWith('image/')) {
-        alert('❌ Please select an image file.');
+    // Validate all files are images
+    const invalidFiles = files.filter(f => !f.type.startsWith('image/'));
+    if (invalidFiles.length > 0) {
+        alert(`❌ ${invalidFiles.length} file(s) are not images. Only image files allowed.`);
         return;
     }
     
-    await uploadPhoto(file);
+    // Upload multiple files
+    if (files.length > 1) {
+        await uploadMultiplePhotos(files);
+    } else {
+        await uploadPhoto(files[0]);
+    }
+    
     event.target.value = '';
 }
 
-// Photo Upload - FIXED: Use backend proxy URL
-async function uploadPhoto(photoBlob) {
-    if (!authToken) {
-        alert('❌ Authentication required for photo upload.');
-        return;
+async function uploadMultiplePhotos(files) {
+    const total = files.length;
+    let success = 0;
+    let failed = 0;
+    
+    // Show progress indicator
+    showLoadingIndicator(`Uploading 0 / ${total} photos...`);
+    
+    for (let i = 0; i < files.length; i++) {
+        try {
+            // Update progress
+            const progressDiv = document.querySelector('.loading-indicator .loading-content div:last-child');
+            if (progressDiv) {
+                progressDiv.textContent = `Uploading ${i + 1} / ${total} photos...`;
+            }
+            
+            // Upload in silent mode
+            await uploadPhoto(files[i], true);
+            success++;
+        } catch (error) {
+            console.error(`Failed to upload ${files[i].name}:`, error);
+            failed++;
+        }
     }
     
-    showLoadingIndicator('Uploading photo...');
+    hideLoadingIndicator();
+    
+    // Refresh gallery once at the end
+    currentLocationPhotos = getLocationPhotos(selectedLocation.name);
+    if (photoViewMode) {
+        const grid = document.getElementById('photoGalleryGrid');
+        if (grid) grid.innerHTML = renderPhotoGrid();
+    } else if (activeEntry) {
+        updateTimerPhotoSection();
+    }
+    
+    // Show summary
+    if (failed === 0) {
+        alert(`✅ Uploaded ${success} photo${success !== 1 ? 's' : ''} successfully!`);
+    } else {
+        alert(`⚠️ Uploaded ${success} photo${success !== 1 ? 's' : ''}.\n${failed} failed.`);
+    }
+}
+
+// Photo Upload - FIXED: Use backend proxy URL
+async function uploadPhoto(photoBlob, silent = false) {
+    if (!authToken) {
+        if (!silent) alert('❌ Authentication required for photo upload.');
+        throw new Error('Authentication required');
+    }
+    
+    if (!silent) showLoadingIndicator('Uploading photo...');
     
     try {
         const formData = new FormData();
@@ -586,22 +638,30 @@ async function uploadPhoto(photoBlob) {
         };
         
         addPhotoToLocation(selectedLocation.name, photoData);
-        currentLocationPhotos = getLocationPhotos(selectedLocation.name);
         
-        hideLoadingIndicator();
-        
-        if (photoViewMode) {
-            showPhotoGallery();
-        } else if (activeEntry) {
-            updateTimerPhotoSection();
+        // Only update UI if not in silent mode
+        if (!silent) {
+            currentLocationPhotos = getLocationPhotos(selectedLocation.name);
+            hideLoadingIndicator();
+            
+            if (photoViewMode) {
+                showPhotoGallery();
+            } else if (activeEntry) {
+                updateTimerPhotoSection();
+            }
+            
+            alert(`✅ Photo uploaded to ${result.storage}!`);
         }
         
-        alert(`✅ Photo uploaded to ${result.storage}!`);
+        return photoData;
         
     } catch (error) {
         console.error('Upload failed:', error);
-        hideLoadingIndicator();
-        alert('❌ Photo upload failed.\n\n' + error.message);
+        if (!silent) {
+            hideLoadingIndicator();
+            alert('❌ Photo upload failed.\n\n' + error.message);
+        }
+        throw error;
     }
 }
 
