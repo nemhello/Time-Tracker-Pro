@@ -12,6 +12,7 @@ let selectedLocation = null;
 let pendingCodeSelection = null;
 let currentCalendarDate = new Date();
 let photoViewContext = null; // Track if viewing from 'timer' or 'details'
+let isTransitioning = false; // Prevent rapid clicks
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -206,7 +207,8 @@ function renderLocationList() {
 // Location Details - WITH PHOTO BUTTON
 function showLocationDetails(name, chargeCodeSZ, chargeCodeMOS, address, category) {
     selectedLocation = { name, chargeCodeSZ, chargeCodeMOS, address, category };
-    currentLocationPhotos = getLocationPhotos(name);
+    // DON'T load photos yet - wait until user clicks "View Photos"
+    currentLocationPhotos = [];
     photoViewMode = false;
     
     if (name === 'Training') {
@@ -225,7 +227,8 @@ function showLocationDetails(name, chargeCodeSZ, chargeCodeMOS, address, categor
 function renderLocationDetailsView() {
     if (!selectedLocation) return;
     
-    const photoCount = currentLocationPhotos.length;
+    // Only get photo count, not actual photos
+    const photoCount = getLocationPhotos(selectedLocation.name).length;
     const lastVisit = getLastVisitDate(selectedLocation.name);
     
     const detailsCard = document.querySelector('#locationDetails .details-card');
@@ -313,22 +316,34 @@ function backFromDetails() {
 
 // Photo Gallery
 function togglePhotoView() {
+    // Prevent rapid clicks
+    if (isTransitioning) return;
+    isTransitioning = true;
+    setTimeout(() => isTransitioning = false, 500);
+    
     photoViewMode = !photoViewMode;
     
     if (photoViewMode) {
+        // NOW load photos (only when user clicks "View Photos")
+        currentLocationPhotos = getLocationPhotos(selectedLocation.name);
+        
         // Track where we're coming from
         photoViewContext = activeEntry ? 'timer' : 'details';
         showPhotoGallery();
     } else {
-        // Return to where we came from
+        // Clear photos from memory FIRST
+        currentLocationPhotos = [];
+        
+        // Return to where we came from - SIMPLE hide/show
         if (photoViewContext === 'timer' && activeEntry) {
-            // Coming from active timer - hide details, show timer
+            // Just hide details, show timer (fast!)
             document.getElementById('locationDetails').classList.add('hidden');
             document.getElementById('activeTimer').classList.remove('hidden');
         } else {
-            // Coming from location details - rebuild details view
+            // Rebuild location details view
             renderLocationDetailsView();
         }
+        
         photoViewContext = null;
     }
 }
@@ -344,38 +359,52 @@ function showPhotoGallery() {
     
     const buttonText = photoViewContext === 'timer' ? '⏱️ Back to Timer' : '⬅️ Back';
     
+    // Show INSTANT loading state (no delay)
     detailsCard.innerHTML = `
         <div class="photo-gallery-header">
             <h2>📸 ${selectedLocation.name}</h2>
-            <p>${currentLocationPhotos.length} photo${currentLocationPhotos.length !== 1 ? 's' : ''}</p>
+            <p>Loading...</p>
         </div>
-        
-        <div class="photo-capture-section">
-            <button class="btn btn-primary btn-capture" onclick="capturePhoto()">
-                📷 Take Photo
-            </button>
-            <input type="file" id="photoFileInput" accept="image/*" style="display: none;" onchange="handlePhotoFile(event)">
-            <button class="btn btn-secondary" onclick="document.getElementById('photoFileInput').click()">
-                📁 Upload Photo
-            </button>
-        </div>
-        
-        <div class="photo-gallery" id="photoGalleryGrid">
-            ${currentLocationPhotos.length > 0 ? '<div class="loading-photos">⏳ Loading...</div>' : '<div class="no-photos">No photos yet. Take your first photo!</div>'}
-        </div>
-        
-        <div class="details-buttons">
-            <button class="btn btn-secondary" onclick="togglePhotoView()">${buttonText}</button>
+        <div style="text-align: center; padding: 60px 20px;">
+            <div class="spinner"></div>
         </div>
     `;
     
-    // Load photos after slight delay to show loading state
-    if (currentLocationPhotos.length > 0) {
-        setTimeout(() => {
-            const grid = document.getElementById('photoGalleryGrid');
-            if (grid) grid.innerHTML = renderPhotoGrid();
-        }, 50);
-    }
+    // Defer heavy work to next frame (keeps UI responsive)
+    requestAnimationFrame(() => {
+        detailsCard.innerHTML = `
+            <div class="photo-gallery-header">
+                <h2>📸 ${selectedLocation.name}</h2>
+                <p>${currentLocationPhotos.length} photo${currentLocationPhotos.length !== 1 ? 's' : ''}</p>
+            </div>
+            
+            <div class="photo-capture-section">
+                <button class="btn btn-primary btn-capture" onclick="capturePhoto()">
+                    📷 Take Photo
+                </button>
+                <input type="file" id="photoFileInput" accept="image/*" style="display: none;" onchange="handlePhotoFile(event)">
+                <button class="btn btn-secondary" onclick="document.getElementById('photoFileInput').click()">
+                    📁 Upload Photo
+                </button>
+            </div>
+            
+            <div class="photo-gallery" id="photoGalleryGrid">
+                ${currentLocationPhotos.length > 0 ? '<div class="loading-photos">⏳ Loading...</div>' : '<div class="no-photos">No photos yet. Take your first photo!</div>'}
+            </div>
+            
+            <div class="details-buttons">
+                <button class="btn btn-secondary" onclick="togglePhotoView()">${buttonText}</button>
+            </div>
+        `;
+        
+        // Load photos progressively
+        if (currentLocationPhotos.length > 0) {
+            setTimeout(() => {
+                const grid = document.getElementById('photoGalleryGrid');
+                if (grid) grid.innerHTML = renderPhotoGrid();
+            }, 50);
+        }
+    });
 }
 
 function renderPhotoGrid() {
