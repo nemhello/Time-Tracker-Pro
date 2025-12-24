@@ -396,13 +396,11 @@ function showPhotoGallery() {
             </div>
             
             <div class="photo-capture-section">
-                <button class="btn btn-primary btn-capture" onclick="capturePhoto()">
-                    📷 Take Photo
-                </button>
                 <input type="file" id="photoFileInput" accept="image/*" multiple style="display: none;" onchange="handlePhotoFile(event)">
-                <button class="btn btn-secondary" onclick="document.getElementById('photoFileInput').click()">
-                    📁 Upload Photos
+                <button class="btn btn-primary btn-upload-full" onclick="document.getElementById('photoFileInput').click()">
+                    📁 Upload Photos from Library
                 </button>
+                <p class="upload-hint">💡 Tip: Use your iPhone Camera app for best quality, then upload here</p>
             </div>
             
             <div class="photo-gallery" id="photoGalleryGrid">
@@ -466,72 +464,7 @@ function formatPhotoDate(timestamp) {
 }
 
 // Photo Capture
-async function capturePhoto() {
-    if (!authToken) {
-        alert('❌ Photo features require authentication.');
-        return;
-    }
-    
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment' } 
-        });
-        
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.autoplay = true;
-        video.playsInline = true;
-        
-        const overlay = document.createElement('div');
-        overlay.className = 'camera-overlay';
-        overlay.innerHTML = `
-            <div class="camera-container">
-                <div class="camera-preview"></div>
-                <div class="camera-controls">
-                    <button class="btn btn-secondary" id="cancelCapture">Cancel</button>
-                    <button class="btn btn-primary" id="captureButton">📷 Capture</button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(overlay);
-        const preview = overlay.querySelector('.camera-preview');
-        preview.appendChild(video);
-        
-        await new Promise((resolve) => {
-            video.onloadedmetadata = () => {
-                video.play();
-                resolve();
-            };
-        });
-        
-        document.getElementById('captureButton').onclick = async () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0);
-            
-            stream.getTracks().forEach(track => track.stop());
-            document.body.removeChild(overlay);
-            
-            canvas.toBlob(async (blob) => {
-                if (blob) {
-                    await uploadPhoto(blob);
-                }
-            }, 'image/jpeg', 0.9);
-        };
-        
-        document.getElementById('cancelCapture').onclick = () => {
-            stream.getTracks().forEach(track => track.stop());
-            document.body.removeChild(overlay);
-        };
-        
-    } catch (error) {
-        console.error('Camera error:', error);
-        alert('❌ Camera access denied or unavailable.\n\nTry uploading a photo instead.');
-    }
-}
+// Camera capture removed - use native iPhone Camera app instead
 
 async function handlePhotoFile(event) {
     const files = Array.from(event.target.files);
@@ -701,17 +634,18 @@ function viewFullPhoto(index) {
                 <button onclick="closePhotoViewer()">✕ Close</button>
                 <div class="photo-info">${index + 1} / ${currentLocationPhotos.length}</div>
             </div>
-            <div class="photo-viewer-image-container">
+            <div class="photo-viewer-image-container" id="photoViewerContainer">
                 <img 
                     class="photo-viewer-thumbnail" 
                     src="${photo.url}" 
                     alt="Loading..."
                     style="filter: blur(5px); opacity: 0.7;">
                 <img 
+                    id="photoViewerImage"
                     class="photo-viewer-fullres" 
                     src="${photo.fullUrl || photo.url}" 
                     alt="Photo"
-                    style="opacity: 0;"
+                    style="opacity: 0; transform-origin: center center;"
                     onload="this.style.opacity='1'; this.previousElementSibling.style.display='none';"
                     onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22400%22%3E%3Crect fill=%22%23222%22 width=%22400%22 height=%22400%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22 font-size=%2220%22%3EImage Failed to Load%3C/text%3E%3C/svg%3E'">
             </div>
@@ -719,6 +653,7 @@ function viewFullPhoto(index) {
                 <div>${selectedLocation.name}</div>
                 <div>${new Date(photo.timestamp).toLocaleString()}</div>
                 <div>${photo.storage === 'immich' ? '🏠 Immich' : photo.storage === 'cloudinary' ? '☁️ Cloudinary' : '📱 Local'}</div>
+                <button class="btn-open-photos" onclick="openInPhotos('${photo.fullUrl || photo.url}')">📱 Open in Photos App</button>
             </div>
             <div class="photo-viewer-nav">
                 ${index > 0 ? `<button onclick="viewFullPhoto(${index - 1})">← Previous</button>` : '<div></div>'}
@@ -729,6 +664,147 @@ function viewFullPhoto(index) {
     `;
     
     document.body.appendChild(viewer);
+    
+    // Initialize native-like zoom gestures
+    setTimeout(() => initPhotoZoom(), 100);
+}
+
+// Native-like zoom and pan functionality
+function initPhotoZoom() {
+    const img = document.getElementById('photoViewerImage');
+    const container = document.getElementById('photoViewerContainer');
+    
+    if (!img || !container) return;
+    
+    let scale = 1;
+    let translateX = 0;
+    let translateY = 0;
+    let lastTouchDistance = 0;
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let lastTap = 0;
+    
+    function updateTransform() {
+        img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+    }
+    
+    function resetTransform() {
+        scale = 1;
+        translateX = 0;
+        translateY = 0;
+        updateTransform();
+    }
+    
+    function getTouchDistance(touches) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+    
+    // Double-tap to zoom
+    img.addEventListener('touchend', (e) => {
+        const now = Date.now();
+        if (now - lastTap < 300) {
+            e.preventDefault();
+            if (scale === 1) {
+                scale = 2.5;
+            } else {
+                resetTransform();
+            }
+            updateTransform();
+        }
+        lastTap = now;
+    });
+    
+    // Pinch to zoom
+    container.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            lastTouchDistance = getTouchDistance(e.touches);
+        } else if (e.touches.length === 1 && scale > 1) {
+            isDragging = true;
+            startX = e.touches[0].clientX - translateX;
+            startY = e.touches[0].clientY - translateY;
+        }
+    });
+    
+    container.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            const distance = getTouchDistance(e.touches);
+            const delta = distance / lastTouchDistance;
+            scale = Math.max(1, Math.min(5, scale * delta));
+            lastTouchDistance = distance;
+            updateTransform();
+        } else if (e.touches.length === 1 && isDragging && scale > 1) {
+            e.preventDefault();
+            translateX = e.touches[0].clientX - startX;
+            translateY = e.touches[0].clientY - startY;
+            
+            // Limit dragging to image bounds
+            const maxTranslate = (img.offsetWidth * (scale - 1)) / 2;
+            const maxTranslateY = (img.offsetHeight * (scale - 1)) / 2;
+            translateX = Math.max(-maxTranslate, Math.min(maxTranslate, translateX));
+            translateY = Math.max(-maxTranslateY, Math.min(maxTranslateY, translateY));
+            
+            updateTransform();
+        }
+    });
+    
+    container.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) {
+            isDragging = false;
+            if (scale === 1) {
+                translateX = 0;
+                translateY = 0;
+                updateTransform();
+            }
+        } else if (e.touches.length === 1) {
+            lastTouchDistance = 0;
+        }
+    });
+    
+    // Desktop: mouse wheel zoom
+    container.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        scale = Math.max(1, Math.min(5, scale * delta));
+        if (scale === 1) {
+            translateX = 0;
+            translateY = 0;
+        }
+        updateTransform();
+    });
+    
+    // Desktop: click and drag
+    let mouseDown = false;
+    container.addEventListener('mousedown', (e) => {
+        if (scale > 1) {
+            mouseDown = true;
+            startX = e.clientX - translateX;
+            startY = e.clientY - translateY;
+            container.style.cursor = 'grabbing';
+        }
+    });
+    
+    container.addEventListener('mousemove', (e) => {
+        if (mouseDown && scale > 1) {
+            translateX = e.clientX - startX;
+            translateY = e.clientY - startY;
+            updateTransform();
+        }
+    });
+    
+    container.addEventListener('mouseup', () => {
+        mouseDown = false;
+        container.style.cursor = scale > 1 ? 'grab' : 'default';
+    });
+    
+    container.addEventListener('mouseleave', () => {
+        mouseDown = false;
+        container.style.cursor = 'default';
+    });
 }
 
 function closePhotoViewer() {
@@ -1463,4 +1539,19 @@ async function showLoginPrompt() {
     } catch { 
         return false; 
     }
+}
+
+// Open photo in iOS Photos app
+function openInPhotos(imageUrl) {
+    // Try to trigger download which opens in Photos
+    const a = document.createElement('a');
+    a.href = imageUrl;
+    a.download = `photo-${Date.now()}.jpg`;
+    a.target = '_blank';
+    a.click();
+    
+    // Also show helpful message
+    setTimeout(() => {
+        alert('📱 Photo opening...\n\nTip: After viewing, you can save to Photos by tapping the share button.');
+    }, 500);
 }

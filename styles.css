@@ -866,12 +866,26 @@ header h1 {
 /* Photo Capture Section */
 .photo-capture-section {
     display: flex;
+    flex-direction: column;
     gap: 10px;
     margin-bottom: 20px;
 }
 
 .photo-capture-section button {
-    flex: 1;
+    width: 100%;
+}
+
+.btn-upload-full {
+    font-size: 16px;
+    padding: 16px;
+}
+
+.upload-hint {
+    text-align: center;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0;
+    font-style: italic;
 }
 
 .btn-capture {
@@ -1036,6 +1050,13 @@ header h1 {
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+    touch-action: none;
+    cursor: grab;
+}
+
+.photo-viewer-image-container:active {
+    cursor: grabbing;
 }
 
 .photo-viewer-thumbnail {
@@ -1044,13 +1065,31 @@ header h1 {
     max-height: 100%;
     object-fit: contain;
     transition: opacity 0.3s;
+    pointer-events: none;
 }
 
 .photo-viewer-fullres {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
-    transition: opacity 0.5s;
+    transition: opacity 0.5s, transform 0.2s ease-out;
+    will-change: transform;
+}
+
+.btn-open-photos {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 12px;
+    width: 100%;
+}
+
+.btn-open-photos:active {
+    background: #2563eb;
 }
 
 .photo-viewer-footer {
