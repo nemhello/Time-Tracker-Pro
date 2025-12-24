@@ -227,38 +227,43 @@ function renderLocationDetailsView() {
     const photoCount = currentLocationPhotos.length;
     const lastVisit = getLastVisitDate(selectedLocation.name);
     
-    document.getElementById('detailsLocation').textContent = selectedLocation.name;
-    document.getElementById('detailsChargeCode').textContent = selectedLocation.chargeCodeSZ || 'No charge code';
+    const detailsCard = document.querySelector('#locationDetails .details-card');
+    if (!detailsCard) return;
     
-    const addressDiv = document.getElementById('detailsAddress');
+    // Rebuild full structure (in case coming from photo gallery)
+    let html = `
+        <div class="details-location" id="detailsLocation">${selectedLocation.name}</div>
+        <div class="details-code" id="detailsChargeCode">${selectedLocation.chargeCodeSZ || 'No charge code'}</div>
+    `;
+    
     if (selectedLocation.address && selectedLocation.address.trim() !== '') {
-        addressDiv.innerHTML = `<a href="https://maps.apple.com/?q=${encodeURIComponent(selectedLocation.address)}" target="_blank">📍 ${selectedLocation.address}</a>`;
-        addressDiv.style.display = 'block';
+        html += `<div id="detailsAddress" class="details-address" style="display: block;">
+            <a href="https://maps.apple.com/?q=${encodeURIComponent(selectedLocation.address)}" target="_blank">📍 ${selectedLocation.address}</a>
+        </div>`;
     } else {
-        addressDiv.style.display = 'none';
+        html += `<div id="detailsAddress" class="details-address" style="display: none;"></div>`;
     }
     
-    const buttonsDiv = document.querySelector('#locationDetails .details-buttons');
-    if (buttonsDiv) {
-        let html = '';
-        
-        if (lastVisit && photoCount > 0) {
-            html += `<div class="photo-info-banner">Last visit: ${lastVisit} • ${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>`;
-        }
-        
-        if (authToken && photoCount > 0) {
-            html += `<button class="btn btn-primary" onclick="togglePhotoView()">📸 View Photos (${photoCount})</button>`;
-        } else if (authToken) {
-            html += `<button class="btn btn-primary" onclick="togglePhotoView()">📷 Add Photos</button>`;
-        }
-        
-        html += `
-            <button class="btn btn-email" onclick="emailDispatchStart()">📧 Email Dispatch</button>
-            <button class="btn btn-primary" onclick="confirmStartTimer()">▶️ Start Timer</button>
-        `;
-        
-        buttonsDiv.innerHTML = html;
+    html += '<div class="details-buttons">';
+    
+    if (lastVisit && photoCount > 0) {
+        html += `<div class="photo-info-banner">Last visit: ${lastVisit} • ${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>`;
     }
+    
+    if (authToken && photoCount > 0) {
+        html += `<button class="btn btn-primary" onclick="togglePhotoView()">📸 View Photos (${photoCount})</button>`;
+    } else if (authToken) {
+        html += `<button class="btn btn-primary" onclick="togglePhotoView()">📷 Add Photos</button>`;
+    }
+    
+    html += `
+        <button class="btn btn-email" onclick="emailDispatchStart()">📧 Email Dispatch</button>
+        <button class="btn btn-primary" onclick="confirmStartTimer()">▶️ Start Timer</button>
+    `;
+    
+    html += '</div>';
+    
+    detailsCard.innerHTML = html;
 }
 
 function getLastVisitDate(locationName) {
@@ -346,7 +351,7 @@ function showPhotoGallery() {
         </div>
         
         <div class="details-buttons">
-            <button class="btn btn-secondary" onclick="togglePhotoView()">⏱️ Back to Timer</button>
+            <button class="btn btn-secondary" onclick="togglePhotoView()">⬅️ Back to Location</button>
         </div>
     `;
 }
@@ -783,6 +788,8 @@ function closePhotoModal() {
     if (modal) {
         document.body.removeChild(modal);
     }
+    // Clear selectedLocation so app doesn't get stuck
+    selectedLocation = null;
 }
 
 function startTimer() {
