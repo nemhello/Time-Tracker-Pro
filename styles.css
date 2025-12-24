@@ -566,6 +566,16 @@ header h1 {
     background: #2563eb;
 }
 
+.btn-email {
+    background: #10b981;
+    color: white;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.btn-email:active {
+    background: #059669;
+}
+
 .btn-delete {
     background: #ef4444;
     color: white;
