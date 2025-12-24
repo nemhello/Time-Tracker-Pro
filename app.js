@@ -701,7 +701,20 @@ function viewFullPhoto(index) {
                 <button onclick="closePhotoViewer()">✕ Close</button>
                 <div class="photo-info">${index + 1} / ${currentLocationPhotos.length}</div>
             </div>
-            <img src="${photo.fullUrl || photo.url}" alt="Photo" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22400%22%3E%3Crect fill=%22%23222%22 width=%22400%22 height=%22400%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22 font-size=%2220%22%3EImage Failed to Load%3C/text%3E%3C/svg%3E'">
+            <div class="photo-viewer-image-container">
+                <img 
+                    class="photo-viewer-thumbnail" 
+                    src="${photo.url}" 
+                    alt="Loading..."
+                    style="filter: blur(5px); opacity: 0.7;">
+                <img 
+                    class="photo-viewer-fullres" 
+                    src="${photo.fullUrl || photo.url}" 
+                    alt="Photo"
+                    style="opacity: 0;"
+                    onload="this.style.opacity='1'; this.previousElementSibling.style.display='none';"
+                    onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22400%22%3E%3Crect fill=%22%23222%22 width=%22400%22 height=%22400%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22 font-size=%2220%22%3EImage Failed to Load%3C/text%3E%3C/svg%3E'">
+            </div>
             <div class="photo-viewer-footer">
                 <div>${selectedLocation.name}</div>
                 <div>${new Date(photo.timestamp).toLocaleString()}</div>

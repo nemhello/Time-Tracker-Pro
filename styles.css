@@ -1030,6 +1030,29 @@ header h1 {
     border-radius: 12px;
 }
 
+.photo-viewer-image-container {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.photo-viewer-thumbnail {
+    position: absolute;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transition: opacity 0.3s;
+}
+
+.photo-viewer-fullres {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transition: opacity 0.5s;
+}
+
 .photo-viewer-footer {
     margin-top: 20px;
     text-align: center;
