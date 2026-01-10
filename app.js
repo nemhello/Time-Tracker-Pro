@@ -1110,29 +1110,29 @@ function renderEntries() {
         return;
     }
     
-    list.innerHTML = todayEntries.map(entry => {
-        const start = new Date(entry.startTime);
-        const end = new Date(entry.endTime);
-        const duration = end - start;
-        
-        return `
-            <div class="entry-card">
-                <div class="entry-header">
-                    <div class="entry-location">${entry.location}</div>
-                    <div class="entry-actions">
-                        <button class="btn-edit" onclick="editEntry(${entry.id})">Edit Time</button>
-                        <button class="btn-edit" onclick="editDetails(${entry.id})">Details</button>
-                        <button class="btn-delete" onclick="deleteEntry(${entry.id})">×</button>
-                    </div>
+list.innerHTML = todayEntries.map(entry => {
+    const start = new Date(entry.startTime);
+    const end = new Date(entry.endTime);
+    const duration = end - start;
+    
+    return `
+        <div class="entry-card">
+            <div class="entry-header">
+                <div class="entry-location">${entry.location}</div>
+                <div class="entry-actions">
+                    <button class="btn-edit" onclick="editEntry(${entry.id})">Edit Time</button>
+                    <button class="btn-edit" onclick="editDetails(${entry.id})">Details</button>
+                    <button class="btn-delete" onclick="deleteEntry(${entry.id})">×</button>
                 </div>
-                ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
-                ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
-                <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
-                <div class="entry-duration">${formatDuration(duration)}</div>
-                ${entry.notes ? `<div class="entry-notes">📝 ${entry.notes}</div>` : ''}
             </div>
-        `;
-    }).join('');
+            ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
+            ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
+            <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
+            <div class="entry-duration">${formatDuration(duration)}</div>
+            ${entry.notes ? `<div class="entry-notes">📝 ${entry.notes}</div>` : ''}
+        </div>
+    `;
+}).join('');
     
     const totalMs = todayEntries.reduce((sum, e) => {
         return sum + (new Date(e.endTime) - new Date(e.startTime));
@@ -1149,6 +1149,86 @@ function deleteEntry(id) {
         saveEntries();
         renderEntries();
     }
+}
+
+function editEntry(id) {
+    const entry = entries.find(e => e.id === id);
+    if (!entry) return;
+    
+    const start = new Date(entry.startTime);
+    const end = new Date(entry.endTime);
+    
+    const startStr = start.toTimeString().slice(0, 5);
+    const endStr = end.toTimeString().slice(0, 5);
+    
+    const newStart = prompt(
+        `Edit start time (24-hour format):\nCurrent: ${startStr}\n\nEnter new time (HH:MM):`,
+        startStr
+    );
+    
+    if (!newStart) return;
+    
+    const newEnd = prompt(
+        `Edit end time (24-hour format):\nCurrent: ${endStr}\n\nEnter new time (HH:MM):`,
+        endStr
+    );
+    
+    if (!newEnd) return;
+    
+    const timeRegex = /^([0-1][0-9]|2[0-3]):([0-5][0-9])$/;
+    
+    if (!timeRegex.test(newStart) || !timeRegex.test(newEnd)) {
+        alert('Invalid time format. Use HH:MM (24-hour)\nExample: 08:30 or 14:45');
+        return;
+    }
+    
+    const [startHour, startMin] = newStart.split(':').map(Number);
+    const [endHour, endMin] = newEnd.split(':').map(Number);
+    
+    const newStartDate = new Date(start);
+    newStartDate.setHours(startHour, startMin, 0, 0);
+    
+    const newEndDate = new Date(end);
+    newEndDate.setHours(endHour, endMin, 0, 0);
+    
+    if (newEndDate <= newStartDate) {
+        alert('End time must be after start time');
+        return;
+    }
+    
+    entry.startTime = newStartDate.toISOString();
+    entry.endTime = newEndDate.toISOString();
+    
+    saveEntries();
+    renderEntries();
+}
+
+function editDetails(id) {
+    const entry = entries.find(e => e.id === id);
+    if (!entry) return;
+    
+    const currentWO = entry.workOrder || '';
+    const currentNotes = entry.notes || '';
+    
+    const newWO = prompt(
+        `Edit Work Order # for ${entry.location}:\n\n(Leave blank if none)`,
+        currentWO
+    );
+    
+    if (newWO === null) return;
+    
+    const newNotes = prompt(
+        `Edit notes for ${entry.location}:\n\n(Leave blank to remove notes)`,
+        currentNotes
+    );
+    
+    if (newNotes === null) return;
+    
+    entry.workOrder = newWO.trim();
+    entry.notes = newNotes.trim();
+    
+    saveEntries();
+    renderEntries();
 }
 
 function editEntry(id) {
