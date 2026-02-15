@@ -384,71 +384,20 @@ function formatPhotoDate(timestamp) {
 }
 
 // Photo Capture
-async function capturePhoto() {
+function capturePhoto() {
     if (!authToken) {
-        alert('âŒ Photo features require authentication.');
+        alert('❌ Photo features require authentication.');
         return;
     }
-    
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment' } 
-        });
-        
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.autoplay = true;
-        video.playsInline = true;
-        
-        const overlay = document.createElement('div');
-        overlay.className = 'camera-overlay';
-        overlay.innerHTML = `
-            <div class="camera-container">
-                <div class="camera-preview"></div>
-                <div class="camera-controls">
-                    <button class="btn-secondary" id="cancelCapture">Cancel</button>
-                    <button class="btn-primary" id="captureButton">ðŸ“· Capture</button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(overlay);
-        const preview = overlay.querySelector('.camera-preview');
-        preview.appendChild(video);
-        
-        await new Promise((resolve) => {
-            video.onloadedmetadata = () => {
-                video.play();
-                resolve();
-            };
-        });
-        
-        document.getElementById('captureButton').onclick = async () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0);
-            
-            stream.getTracks().forEach(track => track.stop());
-            document.body.removeChild(overlay);
-            
-            canvas.toBlob(async (blob) => {
-                if (blob) {
-                    await uploadPhoto(blob);
-                }
-            }, 'image/jpeg', 0.9);
-        };
-        
-        document.getElementById('cancelCapture').onclick = () => {
-            stream.getTracks().forEach(track => track.stop());
-            document.body.removeChild(overlay);
-        };
-        
-    } catch (error) {
-        console.error('Camera error:', error);
-        alert('âŒ Camera access denied or unavailable.\n\nTry uploading a photo instead.');
-    }
+    // Use native camera via file input - invokes iPhone native camera
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';  // rear camera
+    input.onchange = (e) => handlePhotoFile(e);
+    input.click();
+}
+
 }
 
 async function handlePhotoFile(event) {
@@ -496,7 +445,9 @@ async function uploadPhoto(photoBlob) {
             storage: result.storage,
             assetId: result.assetId || result.cloudinaryId,
             url: getProxiedImageUrl(result),
-            fullUrl: result.fullUrl || result.url,
+            fullUrl: result.storage === 'immich' && result.assetId
+                ? `${CONFIG.apiUrl}/api/immich/proxy/${result.assetId}?original=true`
+                : (result.fullUrl || result.url),
             timestamp: result.timestamp || new Date().toISOString(),
             location: selectedLocation.name,
             needsSync: result.needsSync || false
@@ -522,7 +473,7 @@ async function uploadPhoto(photoBlob) {
 
 function getProxiedImageUrl(result) {
     if (result.storage === 'immich' && result.assetId) {
-        return `${CONFIG.apiUrl}/api/immich/assets/${result.assetId}/thumbnail`;
+        return `${CONFIG.apiUrl}/api/immich/proxy/${result.assetId}`;
     } else {
         return result.url;
     }
@@ -846,47 +797,6 @@ function deleteEntry(id) {
     }
 }
 
-
-function deletePastEntry(id) {
-    if (confirm('Delete this entry?')) {
-        entries = entries.filter(e => e.id !== id);
-        saveEntries();
-        // Re-render the past entries view
-        const detailDiv = document.getElementById('pastEntriesDetail');
-        if (detailDiv && !detailDiv.classList.contains('hidden')) {
-            const titleDiv = document.getElementById('selectedDateTitle');
-            const dateText = titleDiv ? titleDiv.textContent : '';
-            // Re-render updated entries for this date
-            const entriesDiv = document.getElementById('selectedDateEntries');
-            const dateEntries = entries.filter(e => {
-                return new Date(e.startTime).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) === dateText;
-            });
-            if (dateEntries.length === 0) {
-                detailDiv.classList.add('hidden');
-                renderCalendar();
-            } else {
-                // Trigger a re-render by finding the date from remaining entries
-                const firstEntry = dateEntries[0];
-                const d = new Date(firstEntry.startTime);
-                showDateEntries(d.getFullYear(), d.getMonth(), d.getDate());
-            }
-        }
-        renderCalendar();
-    }
-}
-
-function refreshAfterEdit(entryId) {
-    renderEntries();
-    // Also refresh past entries view if open
-    const detail = document.getElementById('pastEntriesDetail');
-    if (detail && !detail.classList.contains('hidden')) {
-        const entry = entries.find(e => e.id === entryId);
-        if (entry) {
-            const d = new Date(entry.startTime);
-            showDateEntries(d.getFullYear(), d.getMonth(), d.getDate());
-        }
-    }
-}
 function editEntry(id) {
     const entry = entries.find(e => e.id === id);
     if (!entry) return;
@@ -936,7 +846,7 @@ function editEntry(id) {
     entry.endTime = newEndDate.toISOString();
     
     saveEntries();
-    refreshAfterEdit(id);
+    renderEntries();
 }
 
 function editDetails(id) {
@@ -964,7 +874,7 @@ function editDetails(id) {
     entry.notes = newNotes.trim();
     
     saveEntries();
-    refreshAfterEdit(id);
+    renderEntries();
 }
 
 // Calendar
@@ -1079,11 +989,6 @@ function showDateEntries(year, month, day) {
             <div class="entry-card">
                 <div class="entry-header">
                     <div class="entry-location">${entry.location}</div>
-                    <div class="entry-actions">
-                        <button class="btn-edit" onclick="editEntry(${entry.id})">Edit Time</button>
-                        <button class="btn-edit" onclick="editDetails(${entry.id})">Details</button>
-                        <button class="btn-delete" onclick="deletePastEntry(${entry.id})">×</button>
-                    </div>
                 </div>
                 ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
                 ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
