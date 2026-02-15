@@ -1,4 +1,4 @@
-const CONFIG = { apiUrl: 'https://field-api.wilkerson-labs.com' };
+const CONFIG = { apiUrl: 'https://api.wilkerson-labs.com' };
 let authToken = localStorage.getItem('authToken');
 let authExpiry = localStorage.getItem('authExpiry');
 let locationPhotos = {}, currentLocationPhotos = [], photoViewMode = false;
@@ -11,8 +11,6 @@ let selectedCategory = null;
 let selectedLocation = null;
 let pendingCodeSelection = null;
 let currentCalendarDate = new Date();
-let photoViewContext = null; // Track if viewing from 'timer' or 'details'
-let isTransitioning = false; // Prevent rapid clicks
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -23,7 +21,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert('ERROR: Location data failed to load. Please refresh.');
         return;
     }
-    console.log('✓ CATEGORIES loaded:', Object.keys(CATEGORIES).length, 'categories');
+    console.log('âœ“ CATEGORIES loaded:', Object.keys(CATEGORIES).length, 'categories');
     
     setTimeout(() => {
         const clearBtn = document.getElementById('clearSearchBtn');
@@ -192,7 +190,7 @@ function renderLocationList() {
     
     list.innerHTML = locations.map(loc => {
         const photoCount = getLocationPhotos(loc.name).length;
-        const photoIndicator = photoCount > 0 ? ` 📸 ${photoCount}` : '';
+        const photoIndicator = photoCount > 0 ? ` ðŸ“¸ ${photoCount}` : '';
         
         return `
         <div class="location-item" onclick="showLocationDetails('${escapeHtml(loc.name)}', '${escapeHtml(loc.chargeCodeSZ)}', '${escapeHtml(loc.chargeCodeMOS)}', '${escapeHtml(loc.address || '')}', '${escapeHtml(selectedCategory)}')">
@@ -207,8 +205,7 @@ function renderLocationList() {
 // Location Details - WITH PHOTO BUTTON
 function showLocationDetails(name, chargeCodeSZ, chargeCodeMOS, address, category) {
     selectedLocation = { name, chargeCodeSZ, chargeCodeMOS, address, category };
-    // DON'T load photos yet - wait until user clicks "View Photos"
-    currentLocationPhotos = [];
+    currentLocationPhotos = getLocationPhotos(name);
     photoViewMode = false;
     
     if (name === 'Training') {
@@ -227,47 +224,41 @@ function showLocationDetails(name, chargeCodeSZ, chargeCodeMOS, address, categor
 function renderLocationDetailsView() {
     if (!selectedLocation) return;
     
-    // Only get photo count, not actual photos
-    const photoCount = getLocationPhotos(selectedLocation.name).length;
+    const photoCount = currentLocationPhotos.length;
     const lastVisit = getLastVisitDate(selectedLocation.name);
     
-    const detailsCard = document.querySelector('#locationDetails .details-card');
-    if (!detailsCard) return;
+    document.getElementById('detailsLocation').textContent = selectedLocation.name;
+    document.getElementById('detailsChargeCode').textContent = selectedLocation.chargeCodeSZ || 'No charge code';
     
-    // Rebuild full structure (in case coming from photo gallery)
-    let html = `
-        <div class="details-location" id="detailsLocation">${selectedLocation.name}</div>
-        <div class="details-code" id="detailsChargeCode">${selectedLocation.chargeCodeSZ || 'No charge code'}</div>
-    `;
-    
+    const addressDiv = document.getElementById('detailsAddress');
     if (selectedLocation.address && selectedLocation.address.trim() !== '') {
-        html += `<div id="detailsAddress" class="details-address" style="display: block;">
-            <a href="https://maps.apple.com/?q=${encodeURIComponent(selectedLocation.address)}" target="_blank">📍 ${selectedLocation.address}</a>
-        </div>`;
+        addressDiv.innerHTML = `<a href="https://maps.apple.com/?q=${encodeURIComponent(selectedLocation.address)}" target="_blank">ðŸ“ ${selectedLocation.address}</a>`;
+        addressDiv.style.display = 'block';
     } else {
-        html += `<div id="detailsAddress" class="details-address" style="display: none;"></div>`;
+        addressDiv.style.display = 'none';
     }
     
-    html += '<div class="details-buttons">';
-    
-    if (lastVisit && photoCount > 0) {
-        html += `<div class="photo-info-banner">Last visit: ${lastVisit} • ${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>`;
+    const buttonsDiv = document.querySelector('#locationDetails .details-buttons');
+    if (buttonsDiv) {
+        let html = '';
+        
+        if (authToken && photoCount > 0) {
+            html += `<button class="btn-primary" onclick="togglePhotoView()">ðŸ“¸ View Photos (${photoCount})</button>`;
+        } else if (authToken) {
+            html += `<button class="btn-primary" onclick="togglePhotoView()">ðŸ“· Add Photos</button>`;
+        }
+        
+        html += `
+            <button class="btn-secondary" onclick="emailDispatchStart()">ðŸ“§ Email Dispatch</button>
+            <button class="btn-primary" onclick="confirmStartTimer()">â–¶ï¸ Start Timer</button>
+        `;
+        
+        if (lastVisit && photoCount > 0) {
+            html = `<div class="photo-info-banner">Last visit: ${lastVisit} â€¢ ${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>` + html;
+        }
+        
+        buttonsDiv.innerHTML = html;
     }
-    
-    if (authToken && photoCount > 0) {
-        html += `<button class="btn btn-primary" onclick="togglePhotoView()">📸 View Photos (${photoCount})</button>`;
-    } else if (authToken) {
-        html += `<button class="btn btn-primary" onclick="togglePhotoView()">📷 Add Photos</button>`;
-    }
-    
-    html += `
-        <button class="btn btn-email" onclick="emailDispatchStart()">📧 Email Dispatch</button>
-        <button class="btn btn-primary" onclick="confirmStartTimer()">▶️ Start Timer</button>
-    `;
-    
-    html += '</div>';
-    
-    detailsCard.innerHTML = html;
 }
 
 function getLastVisitDate(locationName) {
@@ -316,110 +307,48 @@ function backFromDetails() {
 
 // Photo Gallery
 function togglePhotoView() {
-    // Prevent rapid clicks
-    if (isTransitioning) return;
-    isTransitioning = true;
-    setTimeout(() => isTransitioning = false, 500);
-    
     photoViewMode = !photoViewMode;
     
     if (photoViewMode) {
-        // NOW load photos (only when user clicks "View Photos")
-        currentLocationPhotos = getLocationPhotos(selectedLocation.name);
-        
-        // Track where we're coming from
-        photoViewContext = activeEntry ? 'timer' : 'details';
-        
-        // If coming from timer, need to show locationDetails first
-        if (photoViewContext === 'timer') {
-            document.getElementById('activeTimer').classList.add('hidden');
-            document.getElementById('locationDetails').classList.remove('hidden');
-        }
-        
         showPhotoGallery();
     } else {
-        // Clear photos from memory FIRST
-        currentLocationPhotos = [];
-        
-        // Return to where we came from
-        if (photoViewContext === 'timer' && activeEntry) {
-            // Going back to timer - force clean state
-            const locationDetails = document.getElementById('locationDetails');
-            const activeTimer = document.getElementById('activeTimer');
-            
-            // Reset location details
-            locationDetails.classList.add('hidden');
-            
-            // Show timer
-            activeTimer.classList.remove('hidden');
-            
-            // Reset selected location
-            selectedLocation = null;
-        } else {
-            // Rebuild location details view
-            renderLocationDetailsView();
-        }
-        
-        photoViewContext = null;
-        photoViewMode = false;
+        renderLocationDetailsView();
     }
 }
 
 function showPhotoGallery() {
     if (!authToken) {
-        alert('❌ Photo features require authentication.');
+        alert('âŒ Photo features require authentication.');
         return;
     }
     
     const detailsCard = document.querySelector('#locationDetails .details-card');
     if (!detailsCard) return;
     
-    const buttonText = photoViewContext === 'timer' ? '⏱️ Back to Timer' : '⬅️ Back';
-    
-    // Show INSTANT loading state (no delay)
     detailsCard.innerHTML = `
         <div class="photo-gallery-header">
-            <h2>📸 ${selectedLocation.name}</h2>
-            <p>Loading...</p>
+            <h2>ðŸ“¸ ${selectedLocation.name}</h2>
+            <p>${currentLocationPhotos.length} photo${currentLocationPhotos.length !== 1 ? 's' : ''}</p>
         </div>
-        <div style="text-align: center; padding: 60px 20px;">
-            <div class="spinner"></div>
+        
+        <div class="photo-capture-section">
+            <button class="btn-primary btn-capture" onclick="capturePhoto()">
+                ðŸ“· Take Photo
+            </button>
+            <input type="file" id="photoFileInput" accept="image/*" style="display: none;" onchange="handlePhotoFile(event)">
+            <button class="btn-secondary" onclick="document.getElementById('photoFileInput').click()">
+                ðŸ“ Upload Photo
+            </button>
+        </div>
+        
+        <div class="photo-gallery" id="photoGalleryGrid">
+            ${renderPhotoGrid()}
+        </div>
+        
+        <div class="details-buttons">
+            <button class="btn-secondary" onclick="togglePhotoView()">â±ï¸ Back to Timer</button>
         </div>
     `;
-    
-    // Defer heavy work to next frame (keeps UI responsive)
-    requestAnimationFrame(() => {
-        detailsCard.innerHTML = `
-            <div class="photo-gallery-header">
-                <h2>📸 ${selectedLocation.name}</h2>
-                <p>${currentLocationPhotos.length} photo${currentLocationPhotos.length !== 1 ? 's' : ''}</p>
-            </div>
-            
-            <div class="photo-capture-section">
-                <input type="file" id="photoFileInput" accept="image/*" multiple style="display: none;" onchange="handlePhotoFile(event)">
-                <button class="btn btn-primary btn-upload-full" onclick="document.getElementById('photoFileInput').click()">
-                    📁 Upload Photos from Library
-                </button>
-                <p class="upload-hint">💡 Tip: Use your iPhone Camera app for best quality, then upload here</p>
-            </div>
-            
-            <div class="photo-gallery" id="photoGalleryGrid">
-                ${currentLocationPhotos.length > 0 ? '<div class="loading-photos">⏳ Loading...</div>' : '<div class="no-photos">No photos yet. Take your first photo!</div>'}
-            </div>
-            
-            <div class="details-buttons">
-                <button class="btn btn-secondary" onclick="togglePhotoView()">${buttonText}</button>
-            </div>
-        `;
-        
-        // Load photos progressively
-        if (currentLocationPhotos.length > 0) {
-            setTimeout(() => {
-                const grid = document.getElementById('photoGalleryGrid');
-                if (grid) grid.innerHTML = renderPhotoGrid();
-            }, 50);
-        }
-    });
 }
 
 function renderPhotoGrid() {
@@ -429,19 +358,10 @@ function renderPhotoGrid() {
     
     return currentLocationPhotos.map((photo, index) => `
         <div class="photo-card" onclick="viewFullPhoto(${index})">
-            <div class="photo-spinner-placeholder">
-                <div class="spinner-small"></div>
-            </div>
-            <img 
-                src="${photo.url}" 
-                alt="Photo ${index + 1}" 
-                loading="lazy"
-                onload="this.style.opacity='1'; this.previousElementSibling.style.display='none';"
-                onerror="this.previousElementSibling.innerHTML='❌ Error'; this.style.display='none';"
-                style="opacity: 0; transition: opacity 0.3s;">
+            <img src="${photo.url}" alt="Photo ${index + 1}" loading="lazy">
             <div class="photo-overlay">
                 <div class="photo-date">${formatPhotoDate(photo.timestamp)}</div>
-                ${photo.storage === 'immich' ? '🏠' : photo.storage === 'cloudinary' ? '☁️' : '📱'}
+                ${photo.storage === 'immich' ? 'ðŸ ' : photo.storage === 'cloudinary' ? 'â˜ï¸' : 'ðŸ“±'}
             </div>
         </div>
     `).join('');
@@ -464,81 +384,94 @@ function formatPhotoDate(timestamp) {
 }
 
 // Photo Capture
-// Camera capture removed - use native iPhone Camera app instead
-
-async function handlePhotoFile(event) {
-    const files = Array.from(event.target.files);
-    if (!files || files.length === 0) return;
-    
-    // Validate all files are images
-    const invalidFiles = files.filter(f => !f.type.startsWith('image/'));
-    if (invalidFiles.length > 0) {
-        alert(`❌ ${invalidFiles.length} file(s) are not images. Only image files allowed.`);
+async function capturePhoto() {
+    if (!authToken) {
+        alert('âŒ Photo features require authentication.');
         return;
     }
     
-    // Upload multiple files
-    if (files.length > 1) {
-        await uploadMultiplePhotos(files);
-    } else {
-        await uploadPhoto(files[0]);
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'environment' } 
+        });
+        
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.playsInline = true;
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'camera-overlay';
+        overlay.innerHTML = `
+            <div class="camera-container">
+                <div class="camera-preview"></div>
+                <div class="camera-controls">
+                    <button class="btn-secondary" id="cancelCapture">Cancel</button>
+                    <button class="btn-primary" id="captureButton">ðŸ“· Capture</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        const preview = overlay.querySelector('.camera-preview');
+        preview.appendChild(video);
+        
+        await new Promise((resolve) => {
+            video.onloadedmetadata = () => {
+                video.play();
+                resolve();
+            };
+        });
+        
+        document.getElementById('captureButton').onclick = async () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            stream.getTracks().forEach(track => track.stop());
+            document.body.removeChild(overlay);
+            
+            canvas.toBlob(async (blob) => {
+                if (blob) {
+                    await uploadPhoto(blob);
+                }
+            }, 'image/jpeg', 0.9);
+        };
+        
+        document.getElementById('cancelCapture').onclick = () => {
+            stream.getTracks().forEach(track => track.stop());
+            document.body.removeChild(overlay);
+        };
+        
+    } catch (error) {
+        console.error('Camera error:', error);
+        alert('âŒ Camera access denied or unavailable.\n\nTry uploading a photo instead.');
+    }
+}
+
+async function handlePhotoFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+        alert('âŒ Please select an image file.');
+        return;
     }
     
+    await uploadPhoto(file);
     event.target.value = '';
 }
 
-async function uploadMultiplePhotos(files) {
-    const total = files.length;
-    let success = 0;
-    let failed = 0;
-    
-    // Show progress indicator
-    showLoadingIndicator(`Uploading 0 / ${total} photos...`);
-    
-    for (let i = 0; i < files.length; i++) {
-        try {
-            // Update progress
-            const progressDiv = document.querySelector('.loading-indicator .loading-content div:last-child');
-            if (progressDiv) {
-                progressDiv.textContent = `Uploading ${i + 1} / ${total} photos...`;
-            }
-            
-            // Upload in silent mode
-            await uploadPhoto(files[i], true);
-            success++;
-        } catch (error) {
-            console.error(`Failed to upload ${files[i].name}:`, error);
-            failed++;
-        }
-    }
-    
-    hideLoadingIndicator();
-    
-    // Refresh gallery once at the end
-    currentLocationPhotos = getLocationPhotos(selectedLocation.name);
-    if (photoViewMode) {
-        const grid = document.getElementById('photoGalleryGrid');
-        if (grid) grid.innerHTML = renderPhotoGrid();
-    } else if (activeEntry) {
-        updateTimerPhotoSection();
-    }
-    
-    // Show summary
-    if (failed === 0) {
-        alert(`✅ Uploaded ${success} photo${success !== 1 ? 's' : ''} successfully!`);
-    } else {
-        alert(`⚠️ Uploaded ${success} photo${success !== 1 ? 's' : ''}.\n${failed} failed.`);
-    }
-}
-
-// Photo Upload - FIXED: Use backend proxy URL
-async function uploadPhoto(photoBlob, silent = false) {
+// Photo Upload
+async function uploadPhoto(photoBlob) {
     if (!authToken) {
-        if (!silent) alert('❌ Authentication required for photo upload.');
-        throw new Error('Authentication required');
+        alert('âŒ Authentication required for photo upload.');
+        return;
     }
     
-    if (!silent) showLoadingIndicator('Uploading photo...');
+    showLoadingIndicator('Uploading photo...');
     
     try {
         const formData = new FormData();
@@ -557,13 +490,12 @@ async function uploadPhoto(photoBlob, silent = false) {
         }
         
         const result = await response.json();
-        console.log('Upload result:', result);
         
         const photoData = {
             id: Date.now().toString(),
             storage: result.storage,
             assetId: result.assetId || result.cloudinaryId,
-            url: result.url,  // Backend now returns proxied URL
+            url: getProxiedImageUrl(result),
             fullUrl: result.fullUrl || result.url,
             timestamp: result.timestamp || new Date().toISOString(),
             location: selectedLocation.name,
@@ -571,30 +503,28 @@ async function uploadPhoto(photoBlob, silent = false) {
         };
         
         addPhotoToLocation(selectedLocation.name, photoData);
+        currentLocationPhotos = getLocationPhotos(selectedLocation.name);
         
-        // Only update UI if not in silent mode
-        if (!silent) {
-            currentLocationPhotos = getLocationPhotos(selectedLocation.name);
-            hideLoadingIndicator();
-            
-            if (photoViewMode) {
-                showPhotoGallery();
-            } else if (activeEntry) {
-                updateTimerPhotoSection();
-            }
-            
-            alert(`✅ Photo uploaded to ${result.storage}!`);
+        hideLoadingIndicator();
+        
+        if (photoViewMode) {
+            showPhotoGallery();
         }
         
-        return photoData;
+        alert(`âœ… Photo uploaded to ${result.storage}!`);
         
     } catch (error) {
         console.error('Upload failed:', error);
-        if (!silent) {
-            hideLoadingIndicator();
-            alert('❌ Photo upload failed.\n\n' + error.message);
-        }
-        throw error;
+        hideLoadingIndicator();
+        alert('âŒ Photo upload failed.\n\n' + error.message);
+    }
+}
+
+function getProxiedImageUrl(result) {
+    if (result.storage === 'immich' && result.assetId) {
+        return `${CONFIG.apiUrl}/api/immich/assets/${result.assetId}/thumbnail`;
+    } else {
+        return result.url;
     }
 }
 
@@ -631,180 +561,24 @@ function viewFullPhoto(index) {
     viewer.innerHTML = `
         <div class="photo-viewer">
             <div class="photo-viewer-header">
-                <button onclick="closePhotoViewer()">✕ Close</button>
+                <button onclick="closePhotoViewer()">âœ• Close</button>
                 <div class="photo-info">${index + 1} / ${currentLocationPhotos.length}</div>
             </div>
-            <div class="photo-viewer-image-container" id="photoViewerContainer">
-                <img 
-                    class="photo-viewer-thumbnail" 
-                    src="${photo.url}" 
-                    alt="Loading..."
-                    style="filter: blur(5px); opacity: 0.7;">
-                <img 
-                    id="photoViewerImage"
-                    class="photo-viewer-fullres" 
-                    src="${photo.fullUrl || photo.url}" 
-                    alt="Photo"
-                    style="opacity: 0; transform-origin: center center;"
-                    onload="this.style.opacity='1'; this.previousElementSibling.style.display='none';"
-                    onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22400%22%3E%3Crect fill=%22%23222%22 width=%22400%22 height=%22400%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22 font-size=%2220%22%3EImage Failed to Load%3C/text%3E%3C/svg%3E'">
-            </div>
+            <img src="${photo.fullUrl || photo.url}" alt="Photo">
             <div class="photo-viewer-footer">
                 <div>${selectedLocation.name}</div>
                 <div>${new Date(photo.timestamp).toLocaleString()}</div>
-                <div>${photo.storage === 'immich' ? '🏠 Immich' : photo.storage === 'cloudinary' ? '☁️ Cloudinary' : '📱 Local'}</div>
-                <button class="btn-open-photos" onclick="openInPhotos('${photo.fullUrl || photo.url}')">📱 Open in Photos App</button>
+                <div>${photo.storage === 'immich' ? 'ðŸ  Immich' : photo.storage === 'cloudinary' ? 'â˜ï¸ Cloudinary' : 'ðŸ“± Local'}</div>
             </div>
             <div class="photo-viewer-nav">
-                ${index > 0 ? `<button onclick="viewFullPhoto(${index - 1})">← Previous</button>` : '<div></div>'}
-                <button class="btn-delete" onclick="deletePhoto(${index})">🗑️ Delete</button>
-                ${index < currentLocationPhotos.length - 1 ? `<button onclick="viewFullPhoto(${index + 1})">Next →</button>` : '<div></div>'}
+                ${index > 0 ? `<button onclick="viewFullPhoto(${index - 1})">â† Previous</button>` : '<div></div>'}
+                <button class="btn-delete" onclick="deletePhoto(${index})">ðŸ—‘ï¸ Delete</button>
+                ${index < currentLocationPhotos.length - 1 ? `<button onclick="viewFullPhoto(${index + 1})">Next â†’</button>` : '<div></div>'}
             </div>
         </div>
     `;
     
     document.body.appendChild(viewer);
-    
-    // Initialize native-like zoom gestures
-    setTimeout(() => initPhotoZoom(), 100);
-}
-
-// Native-like zoom and pan functionality
-function initPhotoZoom() {
-    const img = document.getElementById('photoViewerImage');
-    const container = document.getElementById('photoViewerContainer');
-    
-    if (!img || !container) return;
-    
-    let scale = 1;
-    let translateX = 0;
-    let translateY = 0;
-    let lastTouchDistance = 0;
-    let isDragging = false;
-    let startX = 0;
-    let startY = 0;
-    let lastTap = 0;
-    
-    function updateTransform() {
-        img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
-    }
-    
-    function resetTransform() {
-        scale = 1;
-        translateX = 0;
-        translateY = 0;
-        updateTransform();
-    }
-    
-    function getTouchDistance(touches) {
-        const dx = touches[0].clientX - touches[1].clientX;
-        const dy = touches[0].clientY - touches[1].clientY;
-        return Math.sqrt(dx * dx + dy * dy);
-    }
-    
-    // Double-tap to zoom
-    img.addEventListener('touchend', (e) => {
-        const now = Date.now();
-        if (now - lastTap < 300) {
-            e.preventDefault();
-            if (scale === 1) {
-                scale = 2.5;
-            } else {
-                resetTransform();
-            }
-            updateTransform();
-        }
-        lastTap = now;
-    });
-    
-    // Pinch to zoom
-    container.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 2) {
-            e.preventDefault();
-            lastTouchDistance = getTouchDistance(e.touches);
-        } else if (e.touches.length === 1 && scale > 1) {
-            isDragging = true;
-            startX = e.touches[0].clientX - translateX;
-            startY = e.touches[0].clientY - translateY;
-        }
-    });
-    
-    container.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 2) {
-            e.preventDefault();
-            const distance = getTouchDistance(e.touches);
-            const delta = distance / lastTouchDistance;
-            scale = Math.max(1, Math.min(5, scale * delta));
-            lastTouchDistance = distance;
-            updateTransform();
-        } else if (e.touches.length === 1 && isDragging && scale > 1) {
-            e.preventDefault();
-            translateX = e.touches[0].clientX - startX;
-            translateY = e.touches[0].clientY - startY;
-            
-            // Limit dragging to image bounds
-            const maxTranslate = (img.offsetWidth * (scale - 1)) / 2;
-            const maxTranslateY = (img.offsetHeight * (scale - 1)) / 2;
-            translateX = Math.max(-maxTranslate, Math.min(maxTranslate, translateX));
-            translateY = Math.max(-maxTranslateY, Math.min(maxTranslateY, translateY));
-            
-            updateTransform();
-        }
-    });
-    
-    container.addEventListener('touchend', (e) => {
-        if (e.touches.length === 0) {
-            isDragging = false;
-            if (scale === 1) {
-                translateX = 0;
-                translateY = 0;
-                updateTransform();
-            }
-        } else if (e.touches.length === 1) {
-            lastTouchDistance = 0;
-        }
-    });
-    
-    // Desktop: mouse wheel zoom
-    container.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        scale = Math.max(1, Math.min(5, scale * delta));
-        if (scale === 1) {
-            translateX = 0;
-            translateY = 0;
-        }
-        updateTransform();
-    });
-    
-    // Desktop: click and drag
-    let mouseDown = false;
-    container.addEventListener('mousedown', (e) => {
-        if (scale > 1) {
-            mouseDown = true;
-            startX = e.clientX - translateX;
-            startY = e.clientY - translateY;
-            container.style.cursor = 'grabbing';
-        }
-    });
-    
-    container.addEventListener('mousemove', (e) => {
-        if (mouseDown && scale > 1) {
-            translateX = e.clientX - startX;
-            translateY = e.clientY - startY;
-            updateTransform();
-        }
-    });
-    
-    container.addEventListener('mouseup', () => {
-        mouseDown = false;
-        container.style.cursor = scale > 1 ? 'grab' : 'default';
-    });
-    
-    container.addEventListener('mouseleave', () => {
-        mouseDown = false;
-        container.style.cursor = 'default';
-    });
 }
 
 function closePhotoViewer() {
@@ -825,11 +599,9 @@ function deletePhoto(index) {
     
     if (photoViewMode) {
         showPhotoGallery();
-    } else if (activeEntry) {
-        updateTimerPhotoSection();
     }
     
-    alert('✓ Photo deleted');
+    alert('âœ“ Photo deleted');
 }
 
 // Email & Code Modal
@@ -891,7 +663,7 @@ function sendStopEmail(code) {
     window.location.href = `mailto:dispatch@motorolasolutions.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-// Timer - WITH PHOTO SECTION
+// Timer
 function confirmStartTimer() {
     if (!selectedLocation) return;
     
@@ -932,7 +704,7 @@ function showActiveTimer() {
     const addressLink = document.getElementById('activeAddress');
     if (activeEntry.address && activeEntry.address.trim() !== '') {
         addressLink.href = `https://maps.apple.com/?q=${encodeURIComponent(activeEntry.address)}`;
-        addressLink.textContent = `📍 ${activeEntry.address}`;
+        addressLink.textContent = `ðŸ“ ${activeEntry.address}`;
         addressLink.style.display = 'block';
     } else {
         addressLink.style.display = 'none';
@@ -940,83 +712,6 @@ function showActiveTimer() {
     
     document.getElementById('workOrderField').value = activeEntry.workOrder || '';
     document.getElementById('notesField').value = activeEntry.notes || '';
-    
-    // Add photo section to timer
-    updateTimerPhotoSection();
-}
-
-function updateTimerPhotoSection() {
-    if (!activeEntry) return;
-    
-    currentLocationPhotos = getLocationPhotos(activeEntry.location);
-    const photoCount = currentLocationPhotos.length;
-    
-    let photoSection = document.getElementById('timerPhotoSection');
-    if (!photoSection) {
-        photoSection = document.createElement('div');
-        photoSection.id = 'timerPhotoSection';
-        photoSection.className = 'timer-photo-section';
-        
-        const stopBtn = document.getElementById('stopBtn');
-        stopBtn.parentNode.insertBefore(photoSection, stopBtn);
-    }
-    
-    if (authToken) {
-        photoSection.innerHTML = `
-            <div class="timer-photo-buttons">
-                <button class="btn btn-primary" onclick="capturePhotoFromTimer()">📷 Take Photo</button>
-                ${photoCount > 0 ? `<button class="btn btn-secondary" onclick="viewPhotosFromTimer()">📸 View Photos (${photoCount})</button>` : ''}
-            </div>
-        `;
-    } else {
-        photoSection.innerHTML = '';
-    }
-}
-
-function capturePhotoFromTimer() {
-    selectedLocation = {
-        name: activeEntry.location,
-        chargeCodeSZ: activeEntry.chargeCodeSZ,
-        chargeCodeMOS: activeEntry.chargeCodeMOS,
-        address: activeEntry.address
-    };
-    capturePhoto();
-}
-
-function viewPhotosFromTimer() {
-    selectedLocation = {
-        name: activeEntry.location,
-        chargeCodeSZ: activeEntry.chargeCodeSZ,
-        chargeCodeMOS: activeEntry.chargeCodeMOS,
-        address: activeEntry.address
-    };
-    currentLocationPhotos = getLocationPhotos(activeEntry.location);
-    
-    // Show modal with photos
-    const modal = document.createElement('div');
-    modal.className = 'photo-modal-overlay';
-    modal.innerHTML = `
-        <div class="photo-modal">
-            <div class="photo-modal-header">
-                <h2>📸 ${activeEntry.location} Photos</h2>
-                <button onclick="closePhotoModal()">✕ Close</button>
-            </div>
-            <div class="photo-gallery" style="max-height: 60vh; overflow-y: auto;">
-                ${renderPhotoGrid()}
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-}
-
-function closePhotoModal() {
-    const modal = document.querySelector('.photo-modal-overlay');
-    if (modal) {
-        document.body.removeChild(modal);
-    }
-    // Clear state completely
-    currentLocationPhotos = [];
-    selectedLocation = null;
 }
 
 function startTimer() {
@@ -1110,29 +805,29 @@ function renderEntries() {
         return;
     }
     
-list.innerHTML = todayEntries.map(entry => {
-    const start = new Date(entry.startTime);
-    const end = new Date(entry.endTime);
-    const duration = end - start;
-    
-    return `
-        <div class="entry-card">
-            <div class="entry-header">
-                <div class="entry-location">${entry.location}</div>
-                <div class="entry-actions">
-                    <button class="btn-edit" onclick="editEntry(${entry.id})">Edit Time</button>
-                    <button class="btn-edit" onclick="editDetails(${entry.id})">Details</button>
-                    <button class="btn-delete" onclick="deleteEntry(${entry.id})">×</button>
+    list.innerHTML = todayEntries.map(entry => {
+        const start = new Date(entry.startTime);
+        const end = new Date(entry.endTime);
+        const duration = end - start;
+        
+        return `
+            <div class="entry-card">
+                <div class="entry-header">
+                    <div class="entry-location">${entry.location}</div>
+                    <div class="entry-actions">
+                        <button class="btn-edit" onclick="editEntry(${entry.id})">Edit Time</button>
+                        <button class="btn-edit" onclick="editDetails(${entry.id})">Details</button>
+                        <button class="btn-delete" onclick="deleteEntry(${entry.id})">Ã—</button>
+                    </div>
                 </div>
+                ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
+                ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
+                <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
+                <div class="entry-duration">${formatDuration(duration)}</div>
+                ${entry.notes ? `<div class="entry-notes">ðŸ“ ${entry.notes}</div>` : ''}
             </div>
-            ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
-            ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
-            <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
-            <div class="entry-duration">${formatDuration(duration)}</div>
-            ${entry.notes ? `<div class="entry-notes">📝 ${entry.notes}</div>` : ''}
-        </div>
-    `;
-}).join('');
+        `;
+    }).join('');
     
     const totalMs = todayEntries.reduce((sum, e) => {
         return sum + (new Date(e.endTime) - new Date(e.startTime));
@@ -1151,6 +846,47 @@ function deleteEntry(id) {
     }
 }
 
+
+function deletePastEntry(id) {
+    if (confirm('Delete this entry?')) {
+        entries = entries.filter(e => e.id !== id);
+        saveEntries();
+        // Re-render the past entries view
+        const detailDiv = document.getElementById('pastEntriesDetail');
+        if (detailDiv && !detailDiv.classList.contains('hidden')) {
+            const titleDiv = document.getElementById('selectedDateTitle');
+            const dateText = titleDiv ? titleDiv.textContent : '';
+            // Re-render updated entries for this date
+            const entriesDiv = document.getElementById('selectedDateEntries');
+            const dateEntries = entries.filter(e => {
+                return new Date(e.startTime).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) === dateText;
+            });
+            if (dateEntries.length === 0) {
+                detailDiv.classList.add('hidden');
+                renderCalendar();
+            } else {
+                // Trigger a re-render by finding the date from remaining entries
+                const firstEntry = dateEntries[0];
+                const d = new Date(firstEntry.startTime);
+                showDateEntries(d.getFullYear(), d.getMonth(), d.getDate());
+            }
+        }
+        renderCalendar();
+    }
+}
+
+function refreshAfterEdit(entryId) {
+    renderEntries();
+    // Also refresh past entries view if open
+    const detail = document.getElementById('pastEntriesDetail');
+    if (detail && !detail.classList.contains('hidden')) {
+        const entry = entries.find(e => e.id === entryId);
+        if (entry) {
+            const d = new Date(entry.startTime);
+            showDateEntries(d.getFullYear(), d.getMonth(), d.getDate());
+        }
+    }
+}
 function editEntry(id) {
     const entry = entries.find(e => e.id === id);
     if (!entry) return;
@@ -1200,7 +936,7 @@ function editEntry(id) {
     entry.endTime = newEndDate.toISOString();
     
     saveEntries();
-    renderEntries();
+    refreshAfterEdit(id);
 }
 
 function editDetails(id) {
@@ -1228,87 +964,7 @@ function editDetails(id) {
     entry.notes = newNotes.trim();
     
     saveEntries();
-    renderEntries();
-}
-
-function editEntry(id) {
-    const entry = entries.find(e => e.id === id);
-    if (!entry) return;
-    
-    const start = new Date(entry.startTime);
-    const end = new Date(entry.endTime);
-    
-    const startStr = start.toTimeString().slice(0, 5);
-    const endStr = end.toTimeString().slice(0, 5);
-    
-    const newStart = prompt(
-        `Edit start time (24-hour format):\nCurrent: ${startStr}\n\nEnter new time (HH:MM):`,
-        startStr
-    );
-    
-    if (!newStart) return;
-    
-    const newEnd = prompt(
-        `Edit end time (24-hour format):\nCurrent: ${endStr}\n\nEnter new time (HH:MM):`,
-        endStr
-    );
-    
-    if (!newEnd) return;
-    
-    const timeRegex = /^([0-1][0-9]|2[0-3]):([0-5][0-9])$/;
-    
-    if (!timeRegex.test(newStart) || !timeRegex.test(newEnd)) {
-        alert('Invalid time format. Use HH:MM (24-hour)\nExample: 08:30 or 14:45');
-        return;
-    }
-    
-    const [startHour, startMin] = newStart.split(':').map(Number);
-    const [endHour, endMin] = newEnd.split(':').map(Number);
-    
-    const newStartDate = new Date(start);
-    newStartDate.setHours(startHour, startMin, 0, 0);
-    
-    const newEndDate = new Date(end);
-    newEndDate.setHours(endHour, endMin, 0, 0);
-    
-    if (newEndDate <= newStartDate) {
-        alert('End time must be after start time');
-        return;
-    }
-    
-    entry.startTime = newStartDate.toISOString();
-    entry.endTime = newEndDate.toISOString();
-    
-    saveEntries();
-    renderEntries();
-}
-
-function editDetails(id) {
-    const entry = entries.find(e => e.id === id);
-    if (!entry) return;
-    
-    const currentWO = entry.workOrder || '';
-    const currentNotes = entry.notes || '';
-    
-    const newWO = prompt(
-        `Edit Work Order # for ${entry.location}:\n\n(Leave blank if none)`,
-        currentWO
-    );
-    
-    if (newWO === null) return;
-    
-    const newNotes = prompt(
-        `Edit notes for ${entry.location}:\n\n(Leave blank to remove notes)`,
-        currentNotes
-    );
-    
-    if (newNotes === null) return;
-    
-    entry.workOrder = newWO.trim();
-    entry.notes = newNotes.trim();
-    
-    saveEntries();
-    renderEntries();
+    refreshAfterEdit(id);
 }
 
 // Calendar
@@ -1351,9 +1007,9 @@ function renderCalendar() {
     
     let html = `
         <div class="calendar-nav">
-            <button onclick="previousMonth()">← Previous</button>
+            <button onclick="previousMonth()">â† Previous</button>
             <div class="calendar-month-header">${monthNames[month]} ${year}</div>
-            <button onclick="nextMonth()">Next →</button>
+            <button onclick="nextMonth()">Next â†’</button>
         </div>
         <div class="calendar-month">
     `;
@@ -1423,12 +1079,17 @@ function showDateEntries(year, month, day) {
             <div class="entry-card">
                 <div class="entry-header">
                     <div class="entry-location">${entry.location}</div>
+                    <div class="entry-actions">
+                        <button class="btn-edit" onclick="editEntry(${entry.id})">Edit Time</button>
+                        <button class="btn-edit" onclick="editDetails(${entry.id})">Details</button>
+                        <button class="btn-delete" onclick="deletePastEntry(${entry.id})">×</button>
+                    </div>
                 </div>
                 ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
                 ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
                 <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
                 <div class="entry-duration">${formatDuration(duration)}</div>
-                ${entry.notes ? `<div class="entry-notes">📝 ${entry.notes}</div>` : ''}
+                ${entry.notes ? `<div class="entry-notes">ðŸ“ ${entry.notes}</div>` : ''}
             </div>
         `;
     }).join('');
@@ -1447,6 +1108,8 @@ function setupEventListeners() {
     document.getElementById('backFromDetailsBtn').addEventListener('click', backFromDetails);
     document.getElementById('backFromCalendarBtn').addEventListener('click', hideCalendar);
     
+    document.getElementById('emailStartBtn').addEventListener('click', emailDispatchStart);
+    document.getElementById('startTimerBtn').addEventListener('click', confirmStartTimer);
     document.getElementById('stopBtn').addEventListener('click', stopTimer);
     
     document.getElementById('viewPastBtn').addEventListener('click', showCalendar);
@@ -1515,7 +1178,7 @@ function exportData() {
     a.click();
     
     URL.revokeObjectURL(url);
-    alert(`✓ Backup saved: ${filename}\n\nIncludes time entries and photo metadata.`);
+    alert(`âœ“ Backup saved: ${filename}\n\nIncludes time entries and photo metadata.`);
 }
 
 function importData() {
@@ -1533,7 +1196,7 @@ function importData() {
                 const data = JSON.parse(event.target.result);
                 
                 if (!data.entries || !Array.isArray(data.entries)) {
-                    alert('❌ Invalid backup file');
+                    alert('âŒ Invalid backup file');
                     return;
                 }
                 
@@ -1549,10 +1212,10 @@ function importData() {
                     }
                     
                     renderEntries();
-                    alert(`✓ Imported ${entries.length} entries successfully!`);
+                    alert(`âœ“ Imported ${entries.length} entries successfully!`);
                 }
             } catch (err) {
-                alert('❌ Error reading backup file: ' + err.message);
+                alert('âŒ Error reading backup file: ' + err.message);
             }
         };
         
@@ -1599,7 +1262,7 @@ async function checkAuthentication() {
 }
 
 async function showLoginPrompt() {
-    const pass = prompt('🔒 Password (Cancel=timer-only):');
+    const pass = prompt('ðŸ”’ Password (Cancel=timer-only):');
     if (!pass) return false;
     try {
         const res = await fetch(`${CONFIG.apiUrl}/auth/login`, {
@@ -1619,19 +1282,4 @@ async function showLoginPrompt() {
     } catch { 
         return false; 
     }
-}
-
-// Open photo in iOS Photos app
-function openInPhotos(imageUrl) {
-    // Try to trigger download which opens in Photos
-    const a = document.createElement('a');
-    a.href = imageUrl;
-    a.download = `photo-${Date.now()}.jpg`;
-    a.target = '_blank';
-    a.click();
-    
-    // Also show helpful message
-    setTimeout(() => {
-        alert('📱 Photo opening...\n\nTip: After viewing, you can save to Photos by tapping the share button.');
-    }, 500);
 }
