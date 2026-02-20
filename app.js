@@ -2,6 +2,7 @@ const CONFIG = { apiUrl: 'https://api.wilkerson-labs.com' };
 let authToken = localStorage.getItem('authToken');
 let authExpiry = localStorage.getItem('authExpiry');
 let locationPhotos = {}, currentLocationPhotos = [], photoViewMode = false;
+let locationAddresses = {}; // Custom address overrides
 
 // State
 let entries = [];
@@ -36,6 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     loadEntries();
     loadPhotos();
+    loadAddresses();
     renderCategories();
     renderEntries();
     updateCurrentDate();
@@ -59,6 +61,51 @@ function saveEntries() {
 function loadPhotos() {
     const stored = localStorage.getItem('locationPhotos');
     locationPhotos = stored ? JSON.parse(stored) : {};
+}
+
+function loadAddresses() {
+    const stored = localStorage.getItem('locationAddresses');
+    locationAddresses = stored ? JSON.parse(stored) : {};
+}
+
+function saveAddresses() {
+    localStorage.setItem('locationAddresses', JSON.stringify(locationAddresses));
+}
+
+function getLocationAddress(locationName, defaultAddress) {
+    // Check for custom address first, then fall back to default
+    return locationAddresses[locationName] || defaultAddress || '';
+}
+
+function editLocationAddress(locationName, currentAddress) {
+    const newAddress = prompt(
+        `Edit address for ${locationName}:\n\n(Leave blank to use default address)`,
+        currentAddress
+    );
+    
+    if (newAddress === null) return; // Cancelled
+    
+    if (newAddress.trim() === '') {
+        // Remove custom address (use default)
+        delete locationAddresses[locationName];
+    } else {
+        // Save custom address
+        locationAddresses[locationName] = newAddress.trim();
+    }
+    
+    saveAddresses();
+    
+    // Refresh display
+    if (selectedLocation && selectedLocation.name === locationName) {
+        renderLocationDetailsView();
+    }
+    
+    // Refresh active timer if showing
+    if (activeEntry && activeEntry.location === locationName) {
+        activeEntry.address = getLocationAddress(locationName, activeEntry.address);
+        saveActiveEntry();
+        showActiveTimer();
+    }
 }
 
 function savePhotos() {
@@ -231,12 +278,26 @@ function renderLocationDetailsView() {
     document.getElementById('detailsChargeCode').textContent = selectedLocation.chargeCodeSZ || 'No charge code';
     
     const addressDiv = document.getElementById('detailsAddress');
-    if (selectedLocation.address && selectedLocation.address.trim() !== '') {
-        addressDiv.innerHTML = `<a href="https://maps.apple.com/?q=${encodeURIComponent(selectedLocation.address)}" target="_blank">ðŸ“ ${selectedLocation.address}</a>`;
+    const displayAddress = getLocationAddress(selectedLocation.name, selectedLocation.address);
+    
+    if (displayAddress && displayAddress.trim() !== '') {
+        const isCustom = locationAddresses[selectedLocation.name] ? ' (custom)' : '';
+        addressDiv.innerHTML = `
+            <div class="address-container">
+                <a href="https://maps.apple.com/?q=${encodeURIComponent(displayAddress)}" target="_blank" class="address-link">${displayAddress}</a>
+                <button class="btn-edit-address" onclick="editLocationAddress('${escapeHtml(selectedLocation.name)}', '${escapeHtml(displayAddress)}')">Edit${isCustom}</button>
+            </div>
+        `;
         addressDiv.style.display = 'block';
     } else {
-        addressDiv.style.display = 'none';
+        addressDiv.innerHTML = `
+            <button class="btn-add-address" onclick="editLocationAddress('${escapeHtml(selectedLocation.name)}', '')">Add Address</button>
+        `;
+        addressDiv.style.display = 'block';
     }
+    
+    // Update selectedLocation with current address for timer
+    selectedLocation.address = displayAddress;
     
     const buttonsDiv = document.querySelector('#locationDetails .details-buttons');
     if (buttonsDiv) {
@@ -675,7 +736,7 @@ function confirmStartTimer() {
         location: selectedLocation.name,
         chargeCodeSZ: selectedLocation.chargeCodeSZ,
         chargeCodeMOS: selectedLocation.chargeCodeMOS,
-        address: selectedLocation.address,
+        address: getLocationAddress(selectedLocation.name, selectedLocation.address),
         startTime: now.toISOString(),
         endTime: null,
         notes: ''
@@ -704,10 +765,19 @@ function showActiveTimer() {
     }
     
     const addressLink = document.getElementById('activeAddress');
-    if (activeEntry.address && activeEntry.address.trim() !== '') {
-        addressLink.href = `https://maps.apple.com/?q=${encodeURIComponent(activeEntry.address)}`;
-        addressLink.textContent = `ðŸ“ ${activeEntry.address}`;
+    const displayAddress = getLocationAddress(activeEntry.location, activeEntry.address);
+    
+    if (displayAddress && displayAddress.trim() !== '') {
+        addressLink.href = `https://maps.apple.com/?q=${encodeURIComponent(displayAddress)}`;
+        addressLink.textContent = displayAddress;
+        addressLink.onclick = (e) => {
+            if (e.shiftKey || e.ctrlKey || e.metaKey) return true; // Allow opening in new tab
+            e.preventDefault();
+            editLocationAddress(activeEntry.location, displayAddress);
+            return false;
+        };
         addressLink.style.display = 'block';
+        addressLink.title = 'Click to edit address, Ctrl/Cmd+click to open in maps';
     } else {
         addressLink.style.display = 'none';
     }
@@ -1054,6 +1124,114 @@ function showDateEntries(year, month, day) {
 }
 
 // Event Listeners
+// Search Past Entries
+function searchPastEntries(searchTerm) {
+    const resultsDiv = document.getElementById('pastSearchResults');
+    const calendarDiv = document.getElementById('calendarContainer');
+    const detailDiv = document.getElementById('pastEntriesDetail');
+    const clearBtn = document.getElementById('clearPastSearch');
+    
+    if (!searchTerm || searchTerm.trim() === '') {
+        resultsDiv.classList.add('hidden');
+        resultsDiv.innerHTML = '';
+        calendarDiv.style.display = 'block';
+        detailDiv.classList.add('hidden');
+        clearBtn.classList.add('hidden');
+        return;
+    }
+    
+    calendarDiv.style.display = 'none';
+    detailDiv.classList.add('hidden');
+    resultsDiv.classList.remove('hidden');
+    clearBtn.classList.remove('hidden');
+    
+    const term = searchTerm.toLowerCase().trim();
+    
+    // Search all entries
+    const matches = entries.filter(entry => {
+        return (
+            (entry.location && entry.location.toLowerCase().includes(term)) ||
+            (entry.chargeCodeSZ && entry.chargeCodeSZ.toLowerCase().includes(term)) ||
+            (entry.chargeCodeMOS && entry.chargeCodeMOS.toLowerCase().includes(term)) ||
+            (entry.workOrder && entry.workOrder.toLowerCase().includes(term)) ||
+            (entry.notes && entry.notes.toLowerCase().includes(term))
+        );
+    });
+    
+    if (matches.length === 0) {
+        resultsDiv.innerHTML = '<div class="no-entries">No entries found</div>';
+        return;
+    }
+    
+    // Sort by date (newest first)
+    matches.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+    
+    // Group by date
+    const grouped = {};
+    matches.forEach(entry => {
+        const date = new Date(entry.startTime).toDateString();
+        if (!grouped[date]) grouped[date] = [];
+        grouped[date].push(entry);
+    });
+    
+    // Render results
+    let html = `<div class="search-results-header">${matches.length} result${matches.length !== 1 ? 's' : ''} found</div>`;
+    
+    Object.keys(grouped).forEach(dateStr => {
+        const date = new Date(dateStr);
+        const dateEntries = grouped[dateStr];
+        
+        html += `<div class="search-date-group">
+            <div class="search-date-header">${date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>`;
+        
+        dateEntries.forEach(entry => {
+            const start = new Date(entry.startTime);
+            const end = new Date(entry.endTime);
+            const duration = end - start;
+            
+            html += `
+                <div class="entry-card">
+                    <div class="entry-header">
+                        <div class="entry-location">${entry.location}</div>
+                        <div class="entry-actions">
+                            <button class="btn-edit" onclick="editEntry(${entry.id})">Edit Time</button>
+                            <button class="btn-edit" onclick="editDetails(${entry.id})">Details</button>
+                            <button class="btn-delete" onclick="deleteFromSearch(${entry.id})">X</button>
+                        </div>
+                    </div>
+                    ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
+                    ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
+                    <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
+                    <div class="entry-duration">${formatDuration(duration)}</div>
+                    ${entry.notes ? `<div class="entry-notes">Note: ${entry.notes}</div>` : ''}
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+    });
+    
+    resultsDiv.innerHTML = html;
+}
+
+function deleteFromSearch(id) {
+    if (confirm('Delete this entry?')) {
+        entries = entries.filter(e => e.id !== id);
+        saveEntries();
+        // Re-run search to update results
+        const searchBox = document.getElementById('pastSearchBox');
+        if (searchBox) {
+            searchPastEntries(searchBox.value);
+        }
+    }
+}
+
+function clearPastSearch() {
+    const searchBox = document.getElementById('pastSearchBox');
+    if (searchBox) searchBox.value = '';
+    searchPastEntries('');
+}
+
 function setupEventListeners() {
     document.getElementById('globalSearchBox').addEventListener('input', (e) => {
         handleGlobalSearch(e.target.value);
@@ -1063,6 +1241,12 @@ function setupEventListeners() {
     document.getElementById('backBtn').addEventListener('click', backToCategories);
     document.getElementById('backFromDetailsBtn').addEventListener('click', backFromDetails);
     document.getElementById('backFromCalendarBtn').addEventListener('click', hideCalendar);
+    
+    document.getElementById('pastSearchBox').addEventListener('input', (e) => {
+        searchPastEntries(e.target.value);
+    });
+    
+    document.getElementById('clearPastSearch').addEventListener('click', clearPastSearch);
     
     document.getElementById('stopBtn').addEventListener('click', stopTimer);
     
