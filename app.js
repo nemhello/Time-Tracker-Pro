@@ -2,7 +2,6 @@ const CONFIG = { apiUrl: 'https://api.wilkerson-labs.com' };
 let authToken = localStorage.getItem('authToken');
 let authExpiry = localStorage.getItem('authExpiry');
 let locationPhotos = {}, currentLocationPhotos = [], photoViewMode = false;
-let locationAddresses = {}; // Custom address overrides
 
 // State
 let entries = [];
@@ -37,7 +36,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     loadEntries();
     loadPhotos();
-    loadAddresses();
     renderCategories();
     renderEntries();
     updateCurrentDate();
@@ -61,46 +59,6 @@ function saveEntries() {
 function loadPhotos() {
     const stored = localStorage.getItem('locationPhotos');
     locationPhotos = stored ? JSON.parse(stored) : {};
-}
-
-function loadAddresses() {
-    const stored = localStorage.getItem('locationAddresses');
-    locationAddresses = stored ? JSON.parse(stored) : {};
-}
-
-function saveAddresses() {
-    localStorage.setItem('locationAddresses', JSON.stringify(locationAddresses));
-}
-
-function getLocationAddress(locationName, defaultAddress) {
-    return locationAddresses[locationName] || defaultAddress || '';
-}
-
-function editLocationAddress(locationName, currentAddress) {
-    const newAddress = prompt(
-        `Edit address for ${locationName}:\n\n(Leave blank to use default address)`,
-        currentAddress
-    );
-    
-    if (newAddress === null) return;
-    
-    if (newAddress.trim() === '') {
-        delete locationAddresses[locationName];
-    } else {
-        locationAddresses[locationName] = newAddress.trim();
-    }
-    
-    saveAddresses();
-    
-    if (selectedLocation && selectedLocation.name === locationName) {
-        renderLocationDetailsView();
-    }
-    
-    if (activeEntry && activeEntry.location === locationName) {
-        activeEntry.address = getLocationAddress(locationName, activeEntry.address);
-        saveActiveEntry();
-        showActiveTimer();
-    }
 }
 
 function savePhotos() {
@@ -273,44 +231,31 @@ function renderLocationDetailsView() {
     document.getElementById('detailsChargeCode').textContent = selectedLocation.chargeCodeSZ || 'No charge code';
     
     const addressDiv = document.getElementById('detailsAddress');
-    const displayAddress = getLocationAddress(selectedLocation.name, selectedLocation.address);
-    
-    if (displayAddress && displayAddress.trim() !== '') {
-        const isCustom = locationAddresses[selectedLocation.name] ? ' (custom)' : '';
-        addressDiv.innerHTML = `
-            <div class="address-container">
-                <a href="https://maps.apple.com/?q=${encodeURIComponent(displayAddress)}" target="_blank" class="address-link">${displayAddress}</a>
-                <button class="btn-edit-address" onclick="editLocationAddress('${escapeHtml(selectedLocation.name)}', '${escapeHtml(displayAddress)}')">Edit${isCustom}</button>
-            </div>
-        `;
+    if (selectedLocation.address && selectedLocation.address.trim() !== '') {
+        addressDiv.innerHTML = `<a href="https://maps.apple.com/?q=${encodeURIComponent(selectedLocation.address)}" target="_blank">ðŸ“ ${selectedLocation.address}</a>`;
         addressDiv.style.display = 'block';
     } else {
-        addressDiv.innerHTML = `
-            <button class="btn-add-address" onclick="editLocationAddress('${escapeHtml(selectedLocation.name)}', '')">Add Address</button>
-        `;
-        addressDiv.style.display = 'block';
+        addressDiv.style.display = 'none';
     }
-    
-    selectedLocation.address = displayAddress;
     
     const buttonsDiv = document.querySelector('#locationDetails .details-buttons');
     if (buttonsDiv) {
         let html = '';
         
+        if (lastVisit && photoCount > 0) {
+            html += `<div class="photo-info-banner">Last visit: ${lastVisit} &bull; ${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>`;
+        }
+        
         if (authToken && photoCount > 0) {
-            html += `<button class="btn-primary" onclick="togglePhotoView()">View Photos (${photoCount})</button>`;
+            html += `<button class="btn btn-primary" onclick="togglePhotoView()">&#128248; View Photos (${photoCount})</button>`;
         } else if (authToken) {
-            html += `<button class="btn-primary" onclick="togglePhotoView()">Add Photos</button>`;
+            html += `<button class="btn btn-primary" onclick="togglePhotoView()">&#128247; Add Photos</button>`;
         }
         
         html += `
-            <button class="btn-secondary" onclick="emailDispatchStart()">Email Dispatch</button>
-            <button class="btn-primary" onclick="confirmStartTimer()">Start Timer</button>
+            <button class="btn btn-email" onclick="emailDispatchStart()">&#128231; Email Dispatch to Start</button>
+            <button class="btn btn-primary" onclick="confirmStartTimer()">&#9654; Start Timer</button>
         `;
-        
-        if (lastVisit && photoCount > 0) {
-            html = `<div class="photo-info-banner">Last visit: ${lastVisit} â€¢ ${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>` + html;
-        }
         
         buttonsDiv.innerHTML = html;
     }
@@ -373,7 +318,7 @@ function togglePhotoView() {
 
 function showPhotoGallery() {
     if (!authToken) {
-        alert('Photo features require authentication.');
+        alert('âŒ Photo features require authentication.');
         return;
     }
     
@@ -401,7 +346,7 @@ function showPhotoGallery() {
         </div>
         
         <div class="details-buttons">
-            <button class="btn-secondary" onclick="togglePhotoView()">Back to Timer</button>
+            <button class="btn-secondary" onclick="togglePhotoView()">â±ï¸ Back to Timer</button>
         </div>
     `;
 }
@@ -416,7 +361,7 @@ function renderPhotoGrid() {
             <img src="${photo.url}" alt="Photo ${index + 1}" loading="lazy">
             <div class="photo-overlay">
                 <div class="photo-date">${formatPhotoDate(photo.timestamp)}</div>
-                ${photo.storage === 'immich' ? '[Immich]' : photo.storage === 'cloudinary' ? '[Cloud]' : 'ðŸ“±'}
+                ${photo.storage === 'immich' ? 'ðŸ ' : photo.storage === 'cloudinary' ? 'â˜ï¸' : 'ðŸ“±'}
             </div>
         </div>
     `).join('');
@@ -441,7 +386,7 @@ function formatPhotoDate(timestamp) {
 // Photo Capture
 async function capturePhoto() {
     if (!authToken) {
-        alert('Photo features require authentication.');
+        alert('âŒ Photo features require authentication.');
         return;
     }
     
@@ -502,7 +447,7 @@ async function capturePhoto() {
         
     } catch (error) {
         console.error('Camera error:', error);
-        alert('Camera access denied or unavailable.\n\nTry uploading a photo instead.');
+        alert('âŒ Camera access denied or unavailable.\n\nTry uploading a photo instead.');
     }
 }
 
@@ -511,7 +456,7 @@ async function handlePhotoFile(event) {
     if (!file) return;
     
     if (!file.type.startsWith('image/')) {
-        alert('Please select an image file.');
+        alert('âŒ Please select an image file.');
         return;
     }
     
@@ -522,7 +467,7 @@ async function handlePhotoFile(event) {
 // Photo Upload
 async function uploadPhoto(photoBlob) {
     if (!authToken) {
-        alert('Authentication required for photo upload.');
+        alert('âŒ Authentication required for photo upload.');
         return;
     }
     
@@ -551,9 +496,7 @@ async function uploadPhoto(photoBlob) {
             storage: result.storage,
             assetId: result.assetId || result.cloudinaryId,
             url: getProxiedImageUrl(result),
-            fullUrl: result.storage === 'immich' && result.assetId
-                ? `${CONFIG.apiUrl}/api/immich/proxy/${result.assetId}?original=true`
-                : (result.fullUrl || result.url),
+            fullUrl: result.fullUrl || result.url,
             timestamp: result.timestamp || new Date().toISOString(),
             location: selectedLocation.name,
             needsSync: result.needsSync || false
@@ -568,18 +511,18 @@ async function uploadPhoto(photoBlob) {
             showPhotoGallery();
         }
         
-        alert(`SUCCESS: Photo uploaded to ${result.storage}!`);
+        alert(`âœ… Photo uploaded to ${result.storage}!`);
         
     } catch (error) {
         console.error('Upload failed:', error);
         hideLoadingIndicator();
-        alert('Photo upload failed.\n\n' + error.message);
+        alert('âŒ Photo upload failed.\n\n' + error.message);
     }
 }
 
 function getProxiedImageUrl(result) {
     if (result.storage === 'immich' && result.assetId) {
-        return `${CONFIG.apiUrl}/api/immich/proxy/${result.assetId}`;
+        return `${CONFIG.apiUrl}/api/immich/assets/${result.assetId}/thumbnail`;
     } else {
         return result.url;
     }
@@ -618,18 +561,18 @@ function viewFullPhoto(index) {
     viewer.innerHTML = `
         <div class="photo-viewer">
             <div class="photo-viewer-header">
-                <button onclick="closePhotoViewer()">Close</button>
+                <button onclick="closePhotoViewer()">âœ• Close</button>
                 <div class="photo-info">${index + 1} / ${currentLocationPhotos.length}</div>
             </div>
             <img src="${photo.fullUrl || photo.url}" alt="Photo">
             <div class="photo-viewer-footer">
                 <div>${selectedLocation.name}</div>
                 <div>${new Date(photo.timestamp).toLocaleString()}</div>
-                <div>${photo.storage === 'immich' ? 'ðŸ  Immich' : photo.storage === 'cloudinary' ? 'â˜ï¸ Cloudinary' : '[Local]'}</div>
+                <div>${photo.storage === 'immich' ? 'ðŸ  Immich' : photo.storage === 'cloudinary' ? 'â˜ï¸ Cloudinary' : 'ðŸ“± Local'}</div>
             </div>
             <div class="photo-viewer-nav">
                 ${index > 0 ? `<button onclick="viewFullPhoto(${index - 1})">â† Previous</button>` : '<div></div>'}
-                <button class="btn-delete" onclick="deletePhoto(${index})">Delete</button>
+                <button class="btn-delete" onclick="deletePhoto(${index})">ðŸ—‘ï¸ Delete</button>
                 ${index < currentLocationPhotos.length - 1 ? `<button onclick="viewFullPhoto(${index + 1})">Next â†’</button>` : '<div></div>'}
             </div>
         </div>
@@ -658,7 +601,7 @@ function deletePhoto(index) {
         showPhotoGallery();
     }
     
-    alert('Photo deleted');
+    alert('âœ“ Photo deleted');
 }
 
 // Email & Code Modal
@@ -730,7 +673,7 @@ function confirmStartTimer() {
         location: selectedLocation.name,
         chargeCodeSZ: selectedLocation.chargeCodeSZ,
         chargeCodeMOS: selectedLocation.chargeCodeMOS,
-        address: getLocationAddress(selectedLocation.name, selectedLocation.address),
+        address: selectedLocation.address,
         startTime: now.toISOString(),
         endTime: null,
         notes: ''
@@ -759,19 +702,10 @@ function showActiveTimer() {
     }
     
     const addressLink = document.getElementById('activeAddress');
-    const displayAddress = getLocationAddress(activeEntry.location, activeEntry.address);
-    
-    if (displayAddress && displayAddress.trim() !== '') {
-        addressLink.href = `https://maps.apple.com/?q=${encodeURIComponent(displayAddress)}`;
-        addressLink.textContent = displayAddress;
-        addressLink.onclick = (e) => {
-            if (e.shiftKey || e.ctrlKey || e.metaKey) return true;
-            e.preventDefault();
-            editLocationAddress(activeEntry.location, displayAddress);
-            return false;
-        };
+    if (activeEntry.address && activeEntry.address.trim() !== '') {
+        addressLink.href = `https://maps.apple.com/?q=${encodeURIComponent(activeEntry.address)}`;
+        addressLink.textContent = `ðŸ“ ${activeEntry.address}`;
         addressLink.style.display = 'block';
-        addressLink.title = 'Click to edit, Ctrl+click for maps';
     } else {
         addressLink.style.display = 'none';
     }
@@ -881,16 +815,16 @@ function renderEntries() {
                 <div class="entry-header">
                     <div class="entry-location">${entry.location}</div>
                     <div class="entry-actions">
-                        <button class="btn-edit" onclick="editEntry(${entry.id})">Edit Time</button>
-                        <button class="btn-edit" onclick="editDetails(${entry.id})">Details</button>
-                        <button class="btn-delete" onclick="deleteEntry(${entry.id})">Delete</button>
+                        <button class="btn-edit" onclick="editEntry('${entry.id}')">Edit Time</button>
+                        <button class="btn-edit" onclick="editDetails('${entry.id}')">Details</button>
+                        <button class="btn-delete" onclick="deleteEntry('${entry.id}')">&#128465;</button>
                     </div>
                 </div>
                 ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
                 ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
                 <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
                 <div class="entry-duration">${formatDuration(duration)}</div>
-                ${entry.notes ? `<div class="entry-notes">Note: ${entry.notes}</div>` : ''}
+                ${entry.notes ? `<div class="entry-notes">ðŸ“ ${entry.notes}</div>` : ''}
             </div>
         `;
     }).join('');
@@ -1104,17 +1038,12 @@ function showDateEntries(year, month, day) {
             <div class="entry-card">
                 <div class="entry-header">
                     <div class="entry-location">${entry.location}</div>
-                    <div class="entry-actions">
-                        <button class="btn-edit" onclick="editEntry(${entry.id})">Edit Time</button>
-                        <button class="btn-edit" onclick="editDetails(${entry.id})">Details</button>
-                        <button class="btn-delete" onclick="deletePastEntry(${entry.id})">Delete</button>
-                    </div>
                 </div>
                 ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
                 ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
                 <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
                 <div class="entry-duration">${formatDuration(duration)}</div>
-                ${entry.notes ? `<div class="entry-notes">Note: ${entry.notes}</div>` : ''}
+                ${entry.notes ? `<div class="entry-notes">ðŸ“ ${entry.notes}</div>` : ''}
             </div>
         `;
     }).join('');
@@ -1123,105 +1052,6 @@ function showDateEntries(year, month, day) {
 }
 
 // Event Listeners
-// Search Past Entries
-function searchPastEntries(searchTerm) {
-    const resultsDiv = document.getElementById('pastSearchResults');
-    const calendarDiv = document.getElementById('calendarContainer');
-    const detailDiv = document.getElementById('pastEntriesDetail');
-    const clearBtn = document.getElementById('clearPastSearch');
-    
-    if (!searchTerm || searchTerm.trim() === '') {
-        resultsDiv.classList.add('hidden');
-        calendarDiv.style.display = 'block';
-        detailDiv.classList.add('hidden');
-        clearBtn.classList.add('hidden');
-        return;
-    }
-    
-    calendarDiv.style.display = 'none';
-    detailDiv.classList.add('hidden');
-    resultsDiv.classList.remove('hidden');
-    clearBtn.classList.remove('hidden');
-    
-    const term = searchTerm.toLowerCase().trim();
-    const matches = entries.filter(entry => {
-        return (
-            (entry.location && entry.location.toLowerCase().includes(term)) ||
-            (entry.chargeCodeSZ && entry.chargeCodeSZ.toLowerCase().includes(term)) ||
-            (entry.chargeCodeMOS && entry.chargeCodeMOS.toLowerCase().includes(term)) ||
-            (entry.workOrder && entry.workOrder.toLowerCase().includes(term)) ||
-            (entry.notes && entry.notes.toLowerCase().includes(term))
-        );
-    });
-    
-    if (matches.length === 0) {
-        resultsDiv.innerHTML = '<div class="no-entries">No entries found</div>';
-        return;
-    }
-    
-    matches.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
-    
-    const grouped = {};
-    matches.forEach(entry => {
-        const date = new Date(entry.startTime).toDateString();
-        if (!grouped[date]) grouped[date] = [];
-        grouped[date].push(entry);
-    });
-    
-    let html = `<div class="search-results-header">${matches.length} result${matches.length !== 1 ? 's' : ''} found</div>`;
-    
-    Object.keys(grouped).forEach(dateStr => {
-        const date = new Date(dateStr);
-        const dateEntries = grouped[dateStr];
-        
-        html += `<div class="search-date-group">
-            <div class="search-date-header">${date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>`;
-        
-        dateEntries.forEach(entry => {
-            const start = new Date(entry.startTime);
-            const end = new Date(entry.endTime);
-            const duration = end - start;
-            
-            html += `
-                <div class="entry-card">
-                    <div class="entry-header">
-                        <div class="entry-location">${entry.location}</div>
-                        <div class="entry-actions">
-                            <button class="btn-edit" onclick="editEntry(${entry.id})">Edit Time</button>
-                            <button class="btn-edit" onclick="editDetails(${entry.id})">Details</button>
-                            <button class="btn-delete" onclick="deleteFromSearch(${entry.id})">X</button>
-                        </div>
-                    </div>
-                    ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
-                    ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
-                    <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
-                    <div class="entry-duration">${formatDuration(duration)}</div>
-                    ${entry.notes ? `<div class="entry-notes">Note: ${entry.notes}</div>` : ''}
-                </div>
-            `;
-        });
-        
-        html += '</div>';
-    });
-    
-    resultsDiv.innerHTML = html;
-}
-
-function deleteFromSearch(id) {
-    if (confirm('Delete this entry?')) {
-        entries = entries.filter(e => e.id !== id);
-        saveEntries();
-        const searchBox = document.getElementById('pastSearchBox');
-        if (searchBox) searchPastEntries(searchBox.value);
-    }
-}
-
-function clearPastSearch() {
-    const searchBox = document.getElementById('pastSearchBox');
-    if (searchBox) searchBox.value = '';
-    searchPastEntries('');
-}
-
 function setupEventListeners() {
     document.getElementById('globalSearchBox').addEventListener('input', (e) => {
         handleGlobalSearch(e.target.value);
@@ -1231,12 +1061,6 @@ function setupEventListeners() {
     document.getElementById('backBtn').addEventListener('click', backToCategories);
     document.getElementById('backFromDetailsBtn').addEventListener('click', backFromDetails);
     document.getElementById('backFromCalendarBtn').addEventListener('click', hideCalendar);
-    
-    document.getElementById('pastSearchBox').addEventListener('input', (e) => {
-        searchPastEntries(e.target.value);
-    });
-    
-    document.getElementById('clearPastSearch').addEventListener('click', clearPastSearch);
     
     document.getElementById('stopBtn').addEventListener('click', stopTimer);
     
@@ -1306,7 +1130,7 @@ function exportData() {
     a.click();
     
     URL.revokeObjectURL(url);
-    alert(`SUCCESS: Backup saved: ${filename}\n\nIncludes time entries and photo metadata.`);
+    alert(`âœ“ Backup saved: ${filename}\n\nIncludes time entries and photo metadata.`);
 }
 
 function importData() {
@@ -1324,7 +1148,7 @@ function importData() {
                 const data = JSON.parse(event.target.result);
                 
                 if (!data.entries || !Array.isArray(data.entries)) {
-                    alert('Invalid backup file');
+                    alert('âŒ Invalid backup file');
                     return;
                 }
                 
@@ -1343,7 +1167,7 @@ function importData() {
                     alert(`âœ“ Imported ${entries.length} entries successfully!`);
                 }
             } catch (err) {
-                alert('Error reading backup file: ' + err.message);
+                alert('âŒ Error reading backup file: ' + err.message);
             }
         };
         
@@ -1390,7 +1214,7 @@ async function checkAuthentication() {
 }
 
 async function showLoginPrompt() {
-    const pass = prompt('Password (Cancel=timer-only):');
+    const pass = prompt('ðŸ”’ Password (Cancel=timer-only):');
     if (!pass) return false;
     try {
         const res = await fetch(`${CONFIG.apiUrl}/auth/login`, {
