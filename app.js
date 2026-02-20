@@ -815,9 +815,15 @@ function renderEntries() {
                 <div class="entry-header">
                     <div class="entry-location">${entry.location}</div>
                     <div class="entry-actions">
+<<<<<<< HEAD
                         <button class="btn-edit" onclick="editEntry('${entry.id}')">Edit Time</button>
                         <button class="btn-edit" onclick="editDetails('${entry.id}')">Details</button>
                         <button class="btn-delete" onclick="deleteEntry('${entry.id}')">&#128465;</button>
+=======
+                        <button class="btn-edit" onclick="editEntry(${entry.id})">Edit Time</button>
+                        <button class="btn-edit" onclick="editDetails(${entry.id})">Details</button>
+                        <button class="btn-delete" onclick="deleteEntry(${entry.id})">Ã—</button>
+>>>>>>> parent of 86df972 (Update app.js)
                     </div>
                 </div>
                 ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
