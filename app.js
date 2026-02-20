@@ -883,14 +883,14 @@ function renderEntries() {
                     <div class="entry-actions">
                         <button class="btn-edit" onclick="editEntry(${entry.id})">Edit Time</button>
                         <button class="btn-edit" onclick="editDetails(${entry.id})">Details</button>
-                        <button class="btn-delete" onclick="deleteEntry(${entry.id})">Ã—</button>
+                        <button class="btn-delete" onclick="deleteEntry(${entry.id})">Delete</button>
                     </div>
                 </div>
                 ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
                 ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
                 <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
                 <div class="entry-duration">${formatDuration(duration)}</div>
-                ${entry.notes ? `<div class="entry-notes">ðŸ“ ${entry.notes}</div>` : ''}
+                ${entry.notes ? `<div class="entry-notes">Note: ${entry.notes}</div>` : ''}
             </div>
         `;
     }).join('');
@@ -1104,12 +1104,17 @@ function showDateEntries(year, month, day) {
             <div class="entry-card">
                 <div class="entry-header">
                     <div class="entry-location">${entry.location}</div>
+                    <div class="entry-actions">
+                        <button class="btn-edit" onclick="editEntry(${entry.id})">Edit Time</button>
+                        <button class="btn-edit" onclick="editDetails(${entry.id})">Details</button>
+                        <button class="btn-delete" onclick="deletePastEntry(${entry.id})">Delete</button>
+                    </div>
                 </div>
                 ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
                 ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
                 <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
                 <div class="entry-duration">${formatDuration(duration)}</div>
-                ${entry.notes ? `<div class="entry-notes">ðŸ“ ${entry.notes}</div>` : ''}
+                ${entry.notes ? `<div class="entry-notes">Note: ${entry.notes}</div>` : ''}
             </div>
         `;
     }).join('');
