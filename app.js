@@ -823,6 +823,9 @@ function renderEntries() {
                         <button class="btn-edit" onclick="editEntry(${entry.id})">Edit Time</button>
                         <button class="btn-edit" onclick="editDetails(${entry.id})">Details</button>
                         <button class="btn-delete" onclick="deleteEntry(${entry.id})">Ã—</button>
+<<<<<<< HEAD
+>>>>>>> parent of 86df972 (Update app.js)
+=======
 >>>>>>> parent of 86df972 (Update app.js)
                     </div>
                 </div>
