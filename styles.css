@@ -1219,3 +1219,15 @@ header h1 {
     color: white;
     text-decoration: underline;
 }
+
+/* Site link above version */
+.site-link {
+    text-align: center;
+    padding: 8px 20px 0;
+}
+.site-link a {
+    color: #9ca3af;
+    font-size: 12px;
+    text-decoration: none;
+}
+.site-link a:hover { text-decoration: underline; }

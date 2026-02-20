@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert('ERROR: Location data failed to load. Please refresh.');
         return;
     }
-    console.log('âœ“ CATEGORIES loaded:', Object.keys(CATEGORIES).length, 'categories');
+    console.log('�?? CATEGORIES loaded:', Object.keys(CATEGORIES).length, 'categories');
     
     setTimeout(() => {
         const clearBtn = document.getElementById('clearSearchBtn');
@@ -206,7 +206,7 @@ function renderLocationList() {
     
     list.innerHTML = locations.map(loc => {
         const photoCount = getLocationPhotos(loc.name).length;
-        const photoIndicator = photoCount > 0 ? ` ðŸ“¸ ${photoCount}` : '';
+        const photoIndicator = photoCount > 0 ? ` �??� ${photoCount}` : '';
         
         return `
         <div class="location-item" onclick="showLocationDetails('${escapeHtml(loc.name)}', '${escapeHtml(loc.chargeCodeSZ)}', '${escapeHtml(loc.chargeCodeMOS)}', '${escapeHtml(loc.address || '')}', '${escapeHtml(selectedCategory)}')">
@@ -249,7 +249,7 @@ function renderLocationDetailsView() {
     
     const addressDiv = document.getElementById('detailsAddress');
     if (effectiveAddress && effectiveAddress.trim() !== '') {
-        addressDiv.innerHTML = `<div class="address-container"><a href="https://maps.apple.com/?q=${encodeURIComponent(effectiveAddress)}" target="_blank" class="address-link">📍 ${effectiveAddress}</a><button class="btn-edit-address" onclick="editAddress()">Edit</button></div>`;
+        addressDiv.innerHTML = `<div class="address-container"><a href="https://maps.apple.com/?q=${encodeURIComponent(effectiveAddress)}" target="_blank" class="address-link">? ${effectiveAddress}</a><button class="btn-edit-address" onclick="editAddress()">Edit</button></div>`;
         addressDiv.style.display = 'block';
     } else {
         addressDiv.innerHTML = `<button class="btn-add-address" onclick="editAddress()">+ Add Address</button>`;
@@ -345,7 +345,7 @@ function togglePhotoView() {
 
 function showPhotoGallery() {
     if (!authToken) {
-        alert('âŒ Photo features require authentication.');
+        alert('�? Photo features require authentication.');
         return;
     }
     
@@ -354,17 +354,17 @@ function showPhotoGallery() {
     
     detailsCard.innerHTML = `
         <div class="photo-gallery-header">
-            <h2>ðŸ“¸ ${selectedLocation.name}</h2>
+            <h2>�??� ${selectedLocation.name}</h2>
             <p>${currentLocationPhotos.length} photo${currentLocationPhotos.length !== 1 ? 's' : ''}</p>
         </div>
         
         <div class="photo-capture-section">
             <button class="btn-primary btn-capture" onclick="capturePhoto()">
-                ðŸ“· Take Photo
+                �??� Take Photo
             </button>
             <input type="file" id="photoFileInput" accept="image/*" style="display: none;" onchange="handlePhotoFile(event)">
             <button class="btn-secondary" onclick="document.getElementById('photoFileInput').click()">
-                ðŸ“ Upload Photo
+                �??� Upload Photo
             </button>
         </div>
         
@@ -373,7 +373,7 @@ function showPhotoGallery() {
         </div>
         
         <div class="details-buttons">
-            <button class="btn-secondary" onclick="togglePhotoView()">â±ï¸ Back to Timer</button>
+            <button class="btn-secondary" onclick="togglePhotoView()">&#x23F1;&#xFE0F; Back to Timer</button>
         </div>
     `;
 }
@@ -388,7 +388,7 @@ function renderPhotoGrid() {
             <img src="${photo.url}" alt="Photo ${index + 1}" loading="lazy">
             <div class="photo-overlay">
                 <div class="photo-date">${formatPhotoDate(photo.timestamp)}</div>
-                ${photo.storage === 'immich' ? 'ðŸ ' : photo.storage === 'cloudinary' ? 'â˜ï¸' : 'ðŸ“±'}
+                ${photo.storage === 'immich' ? '�?��' : photo.storage === 'cloudinary' ? '�?�️' : '�??�'}
             </div>
         </div>
     `).join('');
@@ -413,7 +413,7 @@ function formatPhotoDate(timestamp) {
 // Photo Capture
 async function capturePhoto() {
     if (!authToken) {
-        alert('âŒ Photo features require authentication.');
+        alert('�? Photo features require authentication.');
         return;
     }
     
@@ -434,7 +434,7 @@ async function capturePhoto() {
                 <div class="camera-preview"></div>
                 <div class="camera-controls">
                     <button class="btn-secondary" id="cancelCapture">Cancel</button>
-                    <button class="btn-primary" id="captureButton">ðŸ“· Capture</button>
+                    <button class="btn-primary" id="captureButton">�??� Capture</button>
                 </div>
             </div>
         `;
@@ -474,7 +474,7 @@ async function capturePhoto() {
         
     } catch (error) {
         console.error('Camera error:', error);
-        alert('âŒ Camera access denied or unavailable.\n\nTry uploading a photo instead.');
+        alert('�? Camera access denied or unavailable.\n\nTry uploading a photo instead.');
     }
 }
 
@@ -483,7 +483,7 @@ async function handlePhotoFile(event) {
     if (!file) return;
     
     if (!file.type.startsWith('image/')) {
-        alert('âŒ Please select an image file.');
+        alert('�? Please select an image file.');
         return;
     }
     
@@ -494,7 +494,7 @@ async function handlePhotoFile(event) {
 // Photo Upload
 async function uploadPhoto(photoBlob) {
     if (!authToken) {
-        alert('âŒ Authentication required for photo upload.');
+        alert('�? Authentication required for photo upload.');
         return;
     }
     
@@ -538,12 +538,12 @@ async function uploadPhoto(photoBlob) {
             showPhotoGallery();
         }
         
-        alert(`âœ… Photo uploaded to ${result.storage}!`);
+        alert(`�?? Photo uploaded to ${result.storage}!`);
         
     } catch (error) {
         console.error('Upload failed:', error);
         hideLoadingIndicator();
-        alert('âŒ Photo upload failed.\n\n' + error.message);
+        alert('�? Photo upload failed.\n\n' + error.message);
     }
 }
 
@@ -588,19 +588,19 @@ function viewFullPhoto(index) {
     viewer.innerHTML = `
         <div class="photo-viewer">
             <div class="photo-viewer-header">
-                <button onclick="closePhotoViewer()">âœ• Close</button>
+                <button onclick="closePhotoViewer()">�?? Close</button>
                 <div class="photo-info">${index + 1} / ${currentLocationPhotos.length}</div>
             </div>
             <img src="${photo.fullUrl || photo.url}" alt="Photo">
             <div class="photo-viewer-footer">
                 <div>${selectedLocation.name}</div>
                 <div>${new Date(photo.timestamp).toLocaleString()}</div>
-                <div>${photo.storage === 'immich' ? 'ðŸ  Immich' : photo.storage === 'cloudinary' ? 'â˜ï¸ Cloudinary' : 'ðŸ“± Local'}</div>
+                <div>${photo.storage === 'immich' ? '�?�� Immich' : photo.storage === 'cloudinary' ? '�?�️ Cloudinary' : '�??� Local'}</div>
             </div>
             <div class="photo-viewer-nav">
-                ${index > 0 ? `<button onclick="viewFullPhoto(${index - 1})">â† Previous</button>` : '<div></div>'}
-                <button class="btn-delete" onclick="deletePhoto(${index})">ðŸ—‘ï¸ Delete</button>
-                ${index < currentLocationPhotos.length - 1 ? `<button onclick="viewFullPhoto(${index + 1})">Next â†’</button>` : '<div></div>'}
+                ${index > 0 ? `<button onclick="viewFullPhoto(${index - 1})">�?� Previous</button>` : '<div></div>'}
+                <button class="btn-delete" onclick="deletePhoto(${index})">�???️ Delete</button>
+                ${index < currentLocationPhotos.length - 1 ? `<button onclick="viewFullPhoto(${index + 1})">Next �??</button>` : '<div></div>'}
             </div>
         </div>
     `;
@@ -628,7 +628,7 @@ function deletePhoto(index) {
         showPhotoGallery();
     }
     
-    alert('âœ“ Photo deleted');
+    alert('�?? Photo deleted');
 }
 
 // Email & Code Modal
@@ -731,7 +731,7 @@ function showActiveTimer() {
     const addressLink = document.getElementById('activeAddress');
     if (activeEntry.address && activeEntry.address.trim() !== '') {
         addressLink.href = `https://maps.apple.com/?q=${encodeURIComponent(activeEntry.address)}`;
-        addressLink.textContent = `ðŸ“ ${activeEntry.address}`;
+        addressLink.textContent = `�??� ${activeEntry.address}`;
         addressLink.style.display = 'block';
     } else {
         addressLink.style.display = 'none';
@@ -851,7 +851,7 @@ function renderEntries() {
                 ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
                 <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
                 <div class="entry-duration">${formatDuration(duration)}</div>
-                ${entry.notes ? `<div class="entry-notes">ðŸ“ ${entry.notes}</div>` : ''}
+                ${entry.notes ? `<div class="entry-notes">�??� ${entry.notes}</div>` : ''}
             </div>
         `;
     }).join('');
@@ -867,14 +867,14 @@ function renderEntries() {
 
 function deleteEntry(id) {
     if (confirm('Delete this entry?')) {
-        entries = entries.filter(e => e.id !== id);
+        entries = entries.filter(e => String(e.id) !== String(id));
         saveEntries();
         renderEntries();
     }
 }
 
 function editEntry(id) {
-    const entry = entries.find(e => e.id === id);
+    const entry = entries.find(e => String(e.id) === String(id));
     if (!entry) return;
     
     const start = new Date(entry.startTime);
@@ -926,7 +926,7 @@ function editEntry(id) {
 }
 
 function editDetails(id) {
-    const entry = entries.find(e => e.id === id);
+    const entry = entries.find(e => String(e.id) === String(id));
     if (!entry) return;
     
     const currentWO = entry.workOrder || '';
@@ -993,9 +993,9 @@ function renderCalendar() {
     
     let html = `
         <div class="calendar-nav">
-            <button onclick="previousMonth()">â† Previous</button>
+            <button onclick="previousMonth()">�?� Previous</button>
             <div class="calendar-month-header">${monthNames[month]} ${year}</div>
-            <button onclick="nextMonth()">Next â†’</button>
+            <button onclick="nextMonth()">Next �??</button>
         </div>
         <div class="calendar-month">
     `;
@@ -1076,7 +1076,7 @@ function showDateEntries(year, month, day) {
                 ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
                 <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
                 <div class="entry-duration">${formatDuration(duration)}</div>
-                ${entry.notes ? `<div class="entry-notes">📝 ${entry.notes}</div>` : ''}
+                ${entry.notes ? `<div class="entry-notes">? ${entry.notes}</div>` : ''}
             </div>
         `;
     }).join('');
@@ -1103,7 +1103,7 @@ function editPastDetails(id) {
 
 function deletePastEntry(id) {
     if (confirm('Delete this entry?')) {
-        entries = entries.filter(e => e.id != id);
+        entries = entries.filter(e => String(e.id) !== String(id));
         saveEntries();
         refreshPastEntries();
     }
@@ -1188,7 +1188,7 @@ function exportData() {
     a.click();
     
     URL.revokeObjectURL(url);
-    alert(`âœ“ Backup saved: ${filename}\n\nIncludes time entries and photo metadata.`);
+    alert(`�?? Backup saved: ${filename}\n\nIncludes time entries and photo metadata.`);
 }
 
 function importData() {
@@ -1206,7 +1206,7 @@ function importData() {
                 const data = JSON.parse(event.target.result);
                 
                 if (!data.entries || !Array.isArray(data.entries)) {
-                    alert('âŒ Invalid backup file');
+                    alert('�? Invalid backup file');
                     return;
                 }
                 
@@ -1222,10 +1222,10 @@ function importData() {
                     }
                     
                     renderEntries();
-                    alert(`âœ“ Imported ${entries.length} entries successfully!`);
+                    alert(`�?? Imported ${entries.length} entries successfully!`);
                 }
             } catch (err) {
-                alert('âŒ Error reading backup file: ' + err.message);
+                alert('�? Error reading backup file: ' + err.message);
             }
         };
         
@@ -1272,7 +1272,7 @@ async function checkAuthentication() {
 }
 
 async function showLoginPrompt() {
-    const pass = prompt('ðŸ”’ Password (Cancel=timer-only):');
+    const pass = prompt('�??? Password (Cancel=timer-only):');
     if (!pass) return false;
     try {
         const res = await fetch(`${CONFIG.apiUrl}/auth/login`, {
