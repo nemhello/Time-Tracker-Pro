@@ -11,6 +11,8 @@ let selectedCategory = null;
 let selectedLocation = null;
 let pendingCodeSelection = null;
 let currentCalendarDate = new Date();
+let addressOverrides = {};
+let lastViewedDate = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -36,6 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     loadEntries();
     loadPhotos();
+    loadAddressOverrides();
     renderCategories();
     renderEntries();
     updateCurrentDate();
@@ -63,6 +66,19 @@ function loadPhotos() {
 
 function savePhotos() {
     localStorage.setItem('locationPhotos', JSON.stringify(locationPhotos));
+}
+
+function loadAddressOverrides() {
+    const stored = localStorage.getItem('addressOverrides');
+    addressOverrides = stored ? JSON.parse(stored) : {};
+}
+
+function saveAddressOverrides() {
+    localStorage.setItem('addressOverrides', JSON.stringify(addressOverrides));
+}
+
+function getEffectiveAddress(locationName, defaultAddress) {
+    return addressOverrides[locationName] !== undefined ? addressOverrides[locationName] : (defaultAddress || '');
 }
 
 function saveActiveEntry() {
@@ -226,16 +242,18 @@ function renderLocationDetailsView() {
     
     const photoCount = currentLocationPhotos.length;
     const lastVisit = getLastVisitDate(selectedLocation.name);
+    const effectiveAddress = getEffectiveAddress(selectedLocation.name, selectedLocation.address);
     
     document.getElementById('detailsLocation').textContent = selectedLocation.name;
     document.getElementById('detailsChargeCode').textContent = selectedLocation.chargeCodeSZ || 'No charge code';
     
     const addressDiv = document.getElementById('detailsAddress');
-    if (selectedLocation.address && selectedLocation.address.trim() !== '') {
-        addressDiv.innerHTML = `<a href="https://maps.apple.com/?q=${encodeURIComponent(selectedLocation.address)}" target="_blank">ðŸ“ ${selectedLocation.address}</a>`;
+    if (effectiveAddress && effectiveAddress.trim() !== '') {
+        addressDiv.innerHTML = `<div class="address-container"><a href="https://maps.apple.com/?q=${encodeURIComponent(effectiveAddress)}" target="_blank" class="address-link">📍 ${effectiveAddress}</a><button class="btn-edit-address" onclick="editAddress()">Edit</button></div>`;
         addressDiv.style.display = 'block';
     } else {
-        addressDiv.style.display = 'none';
+        addressDiv.innerHTML = `<button class="btn-add-address" onclick="editAddress()">+ Add Address</button>`;
+        addressDiv.style.display = 'block';
     }
     
     const buttonsDiv = document.querySelector('#locationDetails .details-buttons');
@@ -261,6 +279,15 @@ function renderLocationDetailsView() {
     }
 }
 
+function editAddress() {
+    if (!selectedLocation) return;
+    const current = getEffectiveAddress(selectedLocation.name, selectedLocation.address);
+    const newAddr = prompt('Enter address (leave blank to remove):', current);
+    if (newAddr === null) return;
+    addressOverrides[selectedLocation.name] = newAddr.trim();
+    saveAddressOverrides();
+    renderLocationDetailsView();
+}
 function getLastVisitDate(locationName) {
     const locationEntries = entries.filter(e => e.location === locationName);
     if (locationEntries.length === 0) return null;
@@ -815,18 +842,9 @@ function renderEntries() {
                 <div class="entry-header">
                     <div class="entry-location">${entry.location}</div>
                     <div class="entry-actions">
-<<<<<<< HEAD
                         <button class="btn-edit" onclick="editEntry('${entry.id}')">Edit Time</button>
                         <button class="btn-edit" onclick="editDetails('${entry.id}')">Details</button>
                         <button class="btn-delete" onclick="deleteEntry('${entry.id}')">&#128465;</button>
-=======
-                        <button class="btn-edit" onclick="editEntry(${entry.id})">Edit Time</button>
-                        <button class="btn-edit" onclick="editDetails(${entry.id})">Details</button>
-                        <button class="btn-delete" onclick="deleteEntry(${entry.id})">Ã—</button>
-<<<<<<< HEAD
->>>>>>> parent of 86df972 (Update app.js)
-=======
->>>>>>> parent of 86df972 (Update app.js)
                     </div>
                 </div>
                 ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
@@ -1018,6 +1036,7 @@ function nextMonth() {
 }
 
 function showDateEntries(year, month, day) {
+    lastViewedDate = { year, month, day };
     const targetDate = new Date(year, month, day);
     const dateString = targetDate.toDateString();
     
@@ -1047,17 +1066,47 @@ function showDateEntries(year, month, day) {
             <div class="entry-card">
                 <div class="entry-header">
                     <div class="entry-location">${entry.location}</div>
+                    <div class="entry-actions">
+                        <button class="btn-edit" onclick="editPastEntry('${entry.id}')">Edit Time</button>
+                        <button class="btn-edit" onclick="editPastDetails('${entry.id}')">Details</button>
+                        <button class="btn-delete" onclick="deletePastEntry('${entry.id}')">&#128465;</button>
+                    </div>
                 </div>
                 ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
                 ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
                 <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
                 <div class="entry-duration">${formatDuration(duration)}</div>
-                ${entry.notes ? `<div class="entry-notes">ðŸ“ ${entry.notes}</div>` : ''}
+                ${entry.notes ? `<div class="entry-notes">📝 ${entry.notes}</div>` : ''}
             </div>
         `;
     }).join('');
     
     detailDiv.classList.remove('hidden');
+}
+
+function refreshPastEntries() {
+    if (lastViewedDate) {
+        showDateEntries(lastViewedDate.year, lastViewedDate.month, lastViewedDate.day);
+        renderCalendar();
+    }
+}
+
+function editPastEntry(id) {
+    editEntry(id);
+    refreshPastEntries();
+}
+
+function editPastDetails(id) {
+    editDetails(id);
+    refreshPastEntries();
+}
+
+function deletePastEntry(id) {
+    if (confirm('Delete this entry?')) {
+        entries = entries.filter(e => e.id != id);
+        saveEntries();
+        refreshPastEntries();
+    }
 }
 
 // Event Listeners

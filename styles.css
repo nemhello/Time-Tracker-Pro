@@ -1206,3 +1206,16 @@ header h1 {
     border-left: 4px solid #007aff;
 }
 
+
+/* Header link */
+.header-link {
+    display: block;
+    color: rgba(255,255,255,0.75);
+    font-size: 11px;
+    text-decoration: none;
+    margin-top: 4px;
+}
+.header-link:hover {
+    color: white;
+    text-decoration: underline;
+}
