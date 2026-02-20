@@ -398,8 +398,6 @@ function capturePhoto() {
     input.click();
 }
 
-}
-
 async function handlePhotoFile(event) {
     const file = event.target.files[0];
     if (!file) return;
