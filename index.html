@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1e40af"> 
     <title>Time Tracker Pro</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="styles.css">
-    <link rel="apple-touch-icon" href="icon192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
 </head>
 <body>
     <div id="app">
         <!-- Header -->
         <header>
-            <h1>⏱️ Time Tracker Pro</h1>
+            <h1>â±ï¸ Time Tracker Pro</h1>
             <div id="currentDate"></div>
         </header>
 
@@ -35,7 +35,7 @@
         <!-- Global Search -->
         <div id="globalSearchSection">
             <div class="search-header">
-                <button id="clearSearchBtn" class="btn-back hidden">← Back</button>
+                <button id="clearSearchBtn" class="btn-back hidden">â† Back</button>
                 <input type="text" id="globalSearchBox" placeholder="Search all locations..." class="search-box">
             </div>
             <div id="globalSearchResults" class="location-list hidden"></div>
@@ -48,20 +48,18 @@
 
         <!-- Location Selection -->
         <div id="locationSelection" class="hidden">
-            <button id="backBtn" class="btn-back">← Back to Categories</button>
+            <button id="backBtn" class="btn-back">â† Back to Categories</button>
             <div id="locationList" class="location-list"></div>
         </div>
 
         <!-- Location Details -->
         <div id="locationDetails" class="hidden">
-            <button id="backFromDetailsBtn" class="btn-back">← Back</button>
+            <button id="backFromDetailsBtn" class="btn-back">â† Back</button>
             <div class="details-card">
                 <div class="details-location" id="detailsLocation"></div>
                 <div class="details-code" id="detailsChargeCode"></div>
                 <div id="detailsAddress" class="details-address"></div>
-                <div class="details-buttons">
-                    <!-- Photo and timer buttons inserted here by renderLocationDetailsView() -->
-                </div>
+                <div class="details-buttons"></div>
             </div>
         </div>
 
@@ -70,14 +68,14 @@
             <h2>Today's Entries</h2>
             <div id="entriesList"></div>
             <div id="totalHours"></div>
-            <button id="viewPastBtn" class="btn btn-secondary">📅 View Past Entries</button>
-            <button id="exportDataBtn" class="btn btn-secondary">💾 Export Backup</button>
-            <button id="importDataBtn" class="btn btn-secondary">📂 Import Backup</button>
+            <button id="viewPastBtn" class="btn btn-secondary">ðŸ“… View Past Entries</button>
+            <button id="exportDataBtn" class="btn btn-secondary">ðŸ’¾ Export Backup</button>
+            <button id="importDataBtn" class="btn btn-secondary">ðŸ“‚ Import Backup</button>
         </div>
         
         <!-- Calendar/Past Entries View -->
         <div id="calendarView" class="hidden">
-            <button id="backFromCalendarBtn" class="btn-back">← Back to Today</button>
+            <button id="backFromCalendarBtn" class="btn-back">â† Back to Today</button>
             <h2>Past Entries</h2>
             <div id="calendarContainer"></div>
             <div id="pastEntriesDetail" class="hidden">
@@ -104,7 +102,7 @@
         </div>
         
         <!-- Version -->
-        <div class="version">v4.0</div>
+        <div class="version">v3.3</div>
     </div>
 
     <script src="locations.js"></script>

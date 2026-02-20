@@ -384,18 +384,71 @@ function formatPhotoDate(timestamp) {
 }
 
 // Photo Capture
-function capturePhoto() {
+async function capturePhoto() {
     if (!authToken) {
-        alert('❌ Photo features require authentication.');
+        alert('âŒ Photo features require authentication.');
         return;
     }
-    // Use native camera via file input - invokes iPhone native camera
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.capture = 'environment';  // rear camera
-    input.onchange = (e) => handlePhotoFile(e);
-    input.click();
+    
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'environment' } 
+        });
+        
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.playsInline = true;
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'camera-overlay';
+        overlay.innerHTML = `
+            <div class="camera-container">
+                <div class="camera-preview"></div>
+                <div class="camera-controls">
+                    <button class="btn-secondary" id="cancelCapture">Cancel</button>
+                    <button class="btn-primary" id="captureButton">ðŸ“· Capture</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        const preview = overlay.querySelector('.camera-preview');
+        preview.appendChild(video);
+        
+        await new Promise((resolve) => {
+            video.onloadedmetadata = () => {
+                video.play();
+                resolve();
+            };
+        });
+        
+        document.getElementById('captureButton').onclick = async () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            stream.getTracks().forEach(track => track.stop());
+            document.body.removeChild(overlay);
+            
+            canvas.toBlob(async (blob) => {
+                if (blob) {
+                    await uploadPhoto(blob);
+                }
+            }, 'image/jpeg', 0.9);
+        };
+        
+        document.getElementById('cancelCapture').onclick = () => {
+            stream.getTracks().forEach(track => track.stop());
+            document.body.removeChild(overlay);
+        };
+        
+    } catch (error) {
+        console.error('Camera error:', error);
+        alert('âŒ Camera access denied or unavailable.\n\nTry uploading a photo instead.');
+    }
 }
 
 async function handlePhotoFile(event) {
@@ -1011,8 +1064,6 @@ function setupEventListeners() {
     document.getElementById('backFromDetailsBtn').addEventListener('click', backFromDetails);
     document.getElementById('backFromCalendarBtn').addEventListener('click', hideCalendar);
     
-    document.getElementById('emailStartBtn').addEventListener('click', emailDispatchStart);
-    document.getElementById('startTimerBtn').addEventListener('click', confirmStartTimer);
     document.getElementById('stopBtn').addEventListener('click', stopTimer);
     
     document.getElementById('viewPastBtn').addEventListener('click', showCalendar);
