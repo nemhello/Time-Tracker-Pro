@@ -395,8 +395,9 @@ function showPhotoGallery() {
             <p>${currentLocationPhotos.length} photo${currentLocationPhotos.length !== 1 ? 's' : ''}</p>
         </div>
         <div class="photo-capture-section">
-            <button class="btn btn-primary btn-capture" onclick="capturePhoto()">📷 Take Photo</button>
-            <input type="file" id="photoFileInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoFile(event)">
+            <input type="file" id="photoCameraInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoFile(event)">
+            <input type="file" id="photoFileInput" accept="image/*" style="display:none;" onchange="handlePhotoFile(event)">
+            <button class="btn btn-primary btn-capture" onclick="document.getElementById('photoCameraInput').click()">📷 Take Photo</button>
             <button class="btn btn-secondary" onclick="document.getElementById('photoFileInput').click()">📁 Upload Photo</button>
         </div>
         <div class="photo-gallery" id="photoGalleryGrid">
