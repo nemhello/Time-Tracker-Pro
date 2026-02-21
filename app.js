@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert('ERROR: Location data failed to load. Please refresh.');
         return;
     }
-    console.log('�?? CATEGORIES loaded:', Object.keys(CATEGORIES).length, 'categories');
+    console.log('âœ“ CATEGORIES loaded:', Object.keys(CATEGORIES).length, 'categories');
     
     setTimeout(() => {
         const clearBtn = document.getElementById('clearSearchBtn');
@@ -206,7 +206,7 @@ function renderLocationList() {
     
     list.innerHTML = locations.map(loc => {
         const photoCount = getLocationPhotos(loc.name).length;
-        const photoIndicator = photoCount > 0 ? ` �??� ${photoCount}` : '';
+        const photoIndicator = photoCount > 0 ? ` ðŸ“¸ ${photoCount}` : '';
         
         return `
         <div class="location-item" onclick="showLocationDetails('${escapeHtml(loc.name)}', '${escapeHtml(loc.chargeCodeSZ)}', '${escapeHtml(loc.chargeCodeMOS)}', '${escapeHtml(loc.address || '')}', '${escapeHtml(selectedCategory)}')">
@@ -249,7 +249,7 @@ function renderLocationDetailsView() {
     
     const addressDiv = document.getElementById('detailsAddress');
     if (effectiveAddress && effectiveAddress.trim() !== '') {
-        addressDiv.innerHTML = `<div class="address-container"><a href="https://maps.apple.com/?q=${encodeURIComponent(effectiveAddress)}" target="_blank" class="address-link">? ${effectiveAddress}</a><button class="btn-edit-address" onclick="editAddress()">Edit</button></div>`;
+        addressDiv.innerHTML = `<div class="address-container"><a href="https://maps.apple.com/?q=${encodeURIComponent(effectiveAddress)}" target="_blank" class="address-link">&#128205; ${effectiveAddress}</a><button class="btn-edit-address" onclick="editAddress()">Edit</button></div>`;
         addressDiv.style.display = 'block';
     } else {
         addressDiv.innerHTML = `<button class="btn-add-address" onclick="editAddress()">+ Add Address</button>`;
@@ -259,22 +259,18 @@ function renderLocationDetailsView() {
     const buttonsDiv = document.querySelector('#locationDetails .details-buttons');
     if (buttonsDiv) {
         let html = '';
-        
         if (lastVisit && photoCount > 0) {
             html += `<div class="photo-info-banner">Last visit: ${lastVisit} &bull; ${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>`;
         }
-        
         if (authToken && photoCount > 0) {
-            html += `<button class="btn btn-primary" onclick="togglePhotoView()">&#128248; View Photos (${photoCount})</button>`;
+            html += `<button class="btn btn-primary" onclick="togglePhotoView()">📸 View Photos (${photoCount})</button>`;
         } else if (authToken) {
-            html += `<button class="btn btn-primary" onclick="togglePhotoView()">&#128247; Add Photos</button>`;
+            html += `<button class="btn btn-primary" onclick="togglePhotoView()">📷 Add Photos</button>`;
         }
-        
         html += `
-            <button class="btn btn-email" onclick="emailDispatchStart()">&#128231; Email Dispatch to Start</button>
-            <button class="btn btn-primary" onclick="confirmStartTimer()">&#9654; Start Timer</button>
+            <button class="btn btn-email" onclick="emailDispatchStart()">📧 Email Dispatch to Start</button>
+            <button class="btn btn-primary" onclick="confirmStartTimer()">▶ Start Timer</button>
         `;
-        
         buttonsDiv.innerHTML = html;
     }
 }
@@ -288,6 +284,7 @@ function editAddress() {
     saveAddressOverrides();
     renderLocationDetailsView();
 }
+
 function getLastVisitDate(locationName) {
     const locationEntries = entries.filter(e => e.location === locationName);
     if (locationEntries.length === 0) return null;
@@ -345,7 +342,7 @@ function togglePhotoView() {
 
 function showPhotoGallery() {
     if (!authToken) {
-        alert('�? Photo features require authentication.');
+        alert('âŒ Photo features require authentication.');
         return;
     }
     
@@ -354,17 +351,17 @@ function showPhotoGallery() {
     
     detailsCard.innerHTML = `
         <div class="photo-gallery-header">
-            <h2>�??� ${selectedLocation.name}</h2>
+            <h2>ðŸ“¸ ${selectedLocation.name}</h2>
             <p>${currentLocationPhotos.length} photo${currentLocationPhotos.length !== 1 ? 's' : ''}</p>
         </div>
         
         <div class="photo-capture-section">
             <button class="btn-primary btn-capture" onclick="capturePhoto()">
-                �??� Take Photo
+                ðŸ“· Take Photo
             </button>
             <input type="file" id="photoFileInput" accept="image/*" style="display: none;" onchange="handlePhotoFile(event)">
             <button class="btn-secondary" onclick="document.getElementById('photoFileInput').click()">
-                �??� Upload Photo
+                ðŸ“ Upload Photo
             </button>
         </div>
         
@@ -373,7 +370,7 @@ function showPhotoGallery() {
         </div>
         
         <div class="details-buttons">
-            <button class="btn-secondary" onclick="togglePhotoView()">&#x23F1;&#xFE0F; Back to Timer</button>
+            <button class="btn-secondary" onclick="togglePhotoView()">⏱️ Back to Timer</button>
         </div>
     `;
 }
@@ -388,7 +385,7 @@ function renderPhotoGrid() {
             <img src="${photo.url}" alt="Photo ${index + 1}" loading="lazy">
             <div class="photo-overlay">
                 <div class="photo-date">${formatPhotoDate(photo.timestamp)}</div>
-                ${photo.storage === 'immich' ? '�?��' : photo.storage === 'cloudinary' ? '�?�️' : '�??�'}
+                ${photo.storage === 'immich' ? 'ðŸ ' : photo.storage === 'cloudinary' ? 'â˜️' : 'ðŸ“±'}
             </div>
         </div>
     `).join('');
@@ -413,7 +410,7 @@ function formatPhotoDate(timestamp) {
 // Photo Capture
 async function capturePhoto() {
     if (!authToken) {
-        alert('�? Photo features require authentication.');
+        alert('âŒ Photo features require authentication.');
         return;
     }
     
@@ -434,7 +431,7 @@ async function capturePhoto() {
                 <div class="camera-preview"></div>
                 <div class="camera-controls">
                     <button class="btn-secondary" id="cancelCapture">Cancel</button>
-                    <button class="btn-primary" id="captureButton">�??� Capture</button>
+                    <button class="btn-primary" id="captureButton">ðŸ“· Capture</button>
                 </div>
             </div>
         `;
@@ -474,7 +471,7 @@ async function capturePhoto() {
         
     } catch (error) {
         console.error('Camera error:', error);
-        alert('�? Camera access denied or unavailable.\n\nTry uploading a photo instead.');
+        alert('âŒ Camera access denied or unavailable.\n\nTry uploading a photo instead.');
     }
 }
 
@@ -483,7 +480,7 @@ async function handlePhotoFile(event) {
     if (!file) return;
     
     if (!file.type.startsWith('image/')) {
-        alert('�? Please select an image file.');
+        alert('âŒ Please select an image file.');
         return;
     }
     
@@ -494,7 +491,7 @@ async function handlePhotoFile(event) {
 // Photo Upload
 async function uploadPhoto(photoBlob) {
     if (!authToken) {
-        alert('�? Authentication required for photo upload.');
+        alert('âŒ Authentication required for photo upload.');
         return;
     }
     
@@ -538,12 +535,12 @@ async function uploadPhoto(photoBlob) {
             showPhotoGallery();
         }
         
-        alert(`�?? Photo uploaded to ${result.storage}!`);
+        alert(`âœ… Photo uploaded to ${result.storage}!`);
         
     } catch (error) {
         console.error('Upload failed:', error);
         hideLoadingIndicator();
-        alert('�? Photo upload failed.\n\n' + error.message);
+        alert('âŒ Photo upload failed.\n\n' + error.message);
     }
 }
 
@@ -588,19 +585,19 @@ function viewFullPhoto(index) {
     viewer.innerHTML = `
         <div class="photo-viewer">
             <div class="photo-viewer-header">
-                <button onclick="closePhotoViewer()">�?? Close</button>
+                <button onclick="closePhotoViewer()">âœ• Close</button>
                 <div class="photo-info">${index + 1} / ${currentLocationPhotos.length}</div>
             </div>
             <img src="${photo.fullUrl || photo.url}" alt="Photo">
             <div class="photo-viewer-footer">
                 <div>${selectedLocation.name}</div>
                 <div>${new Date(photo.timestamp).toLocaleString()}</div>
-                <div>${photo.storage === 'immich' ? '�?�� Immich' : photo.storage === 'cloudinary' ? '�?�️ Cloudinary' : '�??� Local'}</div>
+                <div>${photo.storage === 'immich' ? 'ðŸ  Immich' : photo.storage === 'cloudinary' ? 'â˜️ Cloudinary' : 'ðŸ“± Local'}</div>
             </div>
             <div class="photo-viewer-nav">
-                ${index > 0 ? `<button onclick="viewFullPhoto(${index - 1})">�?� Previous</button>` : '<div></div>'}
-                <button class="btn-delete" onclick="deletePhoto(${index})">�???️ Delete</button>
-                ${index < currentLocationPhotos.length - 1 ? `<button onclick="viewFullPhoto(${index + 1})">Next �??</button>` : '<div></div>'}
+                ${index > 0 ? `<button onclick="viewFullPhoto(${index - 1})">â† Previous</button>` : '<div></div>'}
+                <button class="btn-delete" onclick="deletePhoto(${index})">ðŸ—‘️ Delete</button>
+                ${index < currentLocationPhotos.length - 1 ? `<button onclick="viewFullPhoto(${index + 1})">Next â†’</button>` : '<div></div>'}
             </div>
         </div>
     `;
@@ -628,7 +625,7 @@ function deletePhoto(index) {
         showPhotoGallery();
     }
     
-    alert('�?? Photo deleted');
+    alert('âœ“ Photo deleted');
 }
 
 // Email & Code Modal
@@ -731,7 +728,7 @@ function showActiveTimer() {
     const addressLink = document.getElementById('activeAddress');
     if (activeEntry.address && activeEntry.address.trim() !== '') {
         addressLink.href = `https://maps.apple.com/?q=${encodeURIComponent(activeEntry.address)}`;
-        addressLink.textContent = `�??� ${activeEntry.address}`;
+        addressLink.textContent = `ðŸ“ ${activeEntry.address}`;
         addressLink.style.display = 'block';
     } else {
         addressLink.style.display = 'none';
@@ -844,14 +841,14 @@ function renderEntries() {
                     <div class="entry-actions">
                         <button class="btn-edit" onclick="editEntry('${entry.id}')">Edit Time</button>
                         <button class="btn-edit" onclick="editDetails('${entry.id}')">Details</button>
-                        <button class="btn-delete" onclick="deleteEntry('${entry.id}')">&#128465;</button>
+                        <button class="btn-delete" onclick="deleteEntry('${entry.id}')">🗑️</button>
                     </div>
                 </div>
                 ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
                 ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
                 <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
                 <div class="entry-duration">${formatDuration(duration)}</div>
-                ${entry.notes ? `<div class="entry-notes">�??� ${entry.notes}</div>` : ''}
+                ${entry.notes ? `<div class="entry-notes">ðŸ“ ${entry.notes}</div>` : ''}
             </div>
         `;
     }).join('');
@@ -968,6 +965,9 @@ function hideCalendar() {
     document.getElementById('globalSearchSection').classList.remove('hidden');
     document.getElementById('categorySelection').classList.remove('hidden');
     document.getElementById('pastEntriesDetail').classList.add('hidden');
+    document.getElementById('pastSearchBox').value = '';
+    document.getElementById('pastSearchResults').innerHTML = '';
+    document.getElementById('pastSearchResults').classList.add('hidden');
 }
 
 function renderCalendar() {
@@ -993,9 +993,9 @@ function renderCalendar() {
     
     let html = `
         <div class="calendar-nav">
-            <button onclick="previousMonth()">�?� Previous</button>
+            <button onclick="previousMonth()">â† Previous</button>
             <div class="calendar-month-header">${monthNames[month]} ${year}</div>
-            <button onclick="nextMonth()">Next �??</button>
+            <button onclick="nextMonth()">Next â†’</button>
         </div>
         <div class="calendar-month">
     `;
@@ -1040,28 +1040,23 @@ function showDateEntries(year, month, day) {
     const targetDate = new Date(year, month, day);
     const dateString = targetDate.toDateString();
     
-    const dateEntries = entries.filter(e => {
-        return new Date(e.startTime).toDateString() === dateString;
-    });
-    
+    const dateEntries = entries.filter(e => new Date(e.startTime).toDateString() === dateString);
     if (dateEntries.length === 0) return;
     
-    const detailDiv = document.getElementById('pastEntriesDetail');
-    const titleDiv = document.getElementById('selectedDateTitle');
-    const entriesDiv = document.getElementById('selectedDateEntries');
-    
-    titleDiv.textContent = targetDate.toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+    document.getElementById('selectedDateTitle').textContent = targetDate.toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
     
+    renderPastEntriesForDate(dateEntries);
+    document.getElementById('pastEntriesDetail').classList.remove('hidden');
+}
+
+function renderPastEntriesForDate(dateEntries) {
+    const entriesDiv = document.getElementById('selectedDateEntries');
     entriesDiv.innerHTML = dateEntries.map(entry => {
         const start = new Date(entry.startTime);
         const end = new Date(entry.endTime);
         const duration = end - start;
-        
         return `
             <div class="entry-card">
                 <div class="entry-header">
@@ -1069,37 +1064,35 @@ function showDateEntries(year, month, day) {
                     <div class="entry-actions">
                         <button class="btn-edit" onclick="editPastEntry('${entry.id}')">Edit Time</button>
                         <button class="btn-edit" onclick="editPastDetails('${entry.id}')">Details</button>
-                        <button class="btn-delete" onclick="deletePastEntry('${entry.id}')">&#128465;</button>
+                        <button class="btn-delete" onclick="deletePastEntry('${entry.id}')">🗑️</button>
                     </div>
                 </div>
                 ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
                 ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
                 <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
                 <div class="entry-duration">${formatDuration(duration)}</div>
-                ${entry.notes ? `<div class="entry-notes">? ${entry.notes}</div>` : ''}
+                ${entry.notes ? `<div class="entry-notes">&#128221; ${entry.notes}</div>` : ''}
             </div>
         `;
     }).join('');
-    
-    detailDiv.classList.remove('hidden');
 }
 
 function refreshPastEntries() {
     if (lastViewedDate) {
-        showDateEntries(lastViewedDate.year, lastViewedDate.month, lastViewedDate.day);
+        const { year, month, day } = lastViewedDate;
+        const dateString = new Date(year, month, day).toDateString();
+        const dateEntries = entries.filter(e => new Date(e.startTime).toDateString() === dateString);
+        if (dateEntries.length === 0) {
+            document.getElementById('pastEntriesDetail').classList.add('hidden');
+        } else {
+            renderPastEntriesForDate(dateEntries);
+        }
         renderCalendar();
     }
 }
 
-function editPastEntry(id) {
-    editEntry(id);
-    refreshPastEntries();
-}
-
-function editPastDetails(id) {
-    editDetails(id);
-    refreshPastEntries();
-}
+function editPastEntry(id) { editEntry(id); refreshPastEntries(); }
+function editPastDetails(id) { editDetails(id); refreshPastEntries(); }
 
 function deletePastEntry(id) {
     if (confirm('Delete this entry?')) {
@@ -1108,6 +1101,86 @@ function deletePastEntry(id) {
         refreshPastEntries();
     }
 }
+
+function searchPastEntries() {
+    const term = document.getElementById('pastSearchBox').value.trim().toLowerCase();
+    const resultsDiv = document.getElementById('pastSearchResults');
+    
+    if (!term) {
+        resultsDiv.innerHTML = '';
+        resultsDiv.classList.add('hidden');
+        return;
+    }
+    
+    const matches = entries.filter(e =>
+        e.location.toLowerCase().includes(term) ||
+        (e.chargeCodeSZ && e.chargeCodeSZ.toLowerCase().includes(term)) ||
+        (e.workOrder && e.workOrder.toLowerCase().includes(term)) ||
+        (e.notes && e.notes.toLowerCase().includes(term))
+    );
+    
+    if (matches.length === 0) {
+        resultsDiv.innerHTML = '<div class="no-entries">No entries found</div>';
+        resultsDiv.classList.remove('hidden');
+        return;
+    }
+    
+    // Group by date
+    const groups = {};
+    matches.forEach(e => {
+        const d = new Date(e.startTime).toDateString();
+        if (!groups[d]) groups[d] = [];
+        groups[d].push(e);
+    });
+    
+    // Sort dates newest first
+    const sortedDates = Object.keys(groups).sort((a,b) => new Date(b) - new Date(a));
+    
+    resultsDiv.innerHTML = sortedDates.map(dateStr => {
+        const dateEntries = groups[dateStr];
+        const dateLabel = new Date(dateStr).toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+        return `
+            <div class="search-date-group">
+                <div class="search-date-header">${dateLabel}</div>
+                ${dateEntries.map(entry => {
+                    const start = new Date(entry.startTime);
+                    const end = new Date(entry.endTime);
+                    const duration = end - start;
+                    return `
+                        <div class="entry-card">
+                            <div class="entry-header">
+                                <div class="entry-location">${entry.location}</div>
+                                <div class="entry-actions">
+                                    <button class="btn-edit" onclick="editSearchEntry('${entry.id}')">Edit Time</button>
+                                    <button class="btn-edit" onclick="editSearchDetails('${entry.id}')">Details</button>
+                                    <button class="btn-delete" onclick="deleteSearchEntry('${entry.id}')">🗑️</button>
+                                </div>
+                            </div>
+                            ${entry.chargeCodeSZ ? `<div class="entry-code">${entry.chargeCodeSZ}</div>` : ''}
+                            ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
+                            <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
+                            <div class="entry-duration">${formatDuration(duration)}</div>
+                            ${entry.notes ? `<div class="entry-notes">&#128221; ${entry.notes}</div>` : ''}
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }).join('');
+    
+    resultsDiv.classList.remove('hidden');
+}
+
+function editSearchEntry(id) { editEntry(id); searchPastEntries(); }
+function editSearchDetails(id) { editDetails(id); searchPastEntries(); }
+function deleteSearchEntry(id) {
+    if (confirm('Delete this entry?')) {
+        entries = entries.filter(e => String(e.id) !== String(id));
+        saveEntries();
+        searchPastEntries();
+    }
+}
+
 
 // Event Listeners
 function setupEventListeners() {
@@ -1188,7 +1261,7 @@ function exportData() {
     a.click();
     
     URL.revokeObjectURL(url);
-    alert(`�?? Backup saved: ${filename}\n\nIncludes time entries and photo metadata.`);
+    alert(`âœ“ Backup saved: ${filename}\n\nIncludes time entries and photo metadata.`);
 }
 
 function importData() {
@@ -1206,7 +1279,7 @@ function importData() {
                 const data = JSON.parse(event.target.result);
                 
                 if (!data.entries || !Array.isArray(data.entries)) {
-                    alert('�? Invalid backup file');
+                    alert('âŒ Invalid backup file');
                     return;
                 }
                 
@@ -1222,10 +1295,10 @@ function importData() {
                     }
                     
                     renderEntries();
-                    alert(`�?? Imported ${entries.length} entries successfully!`);
+                    alert(`âœ“ Imported ${entries.length} entries successfully!`);
                 }
             } catch (err) {
-                alert('�? Error reading backup file: ' + err.message);
+                alert('âŒ Error reading backup file: ' + err.message);
             }
         };
         
@@ -1272,7 +1345,7 @@ async function checkAuthentication() {
 }
 
 async function showLoginPrompt() {
-    const pass = prompt('�??? Password (Cancel=timer-only):');
+    const pass = prompt('ðŸ”’ Password (Cancel=timer-only):');
     if (!pass) return false;
     try {
         const res = await fetch(`${CONFIG.apiUrl}/auth/login`, {

@@ -13,13 +13,11 @@
 </head>
 <body>
     <div id="app">
-        <!-- Header -->
         <header>
-            <h1>&#x23F1;&#xFE0F; Time Tracker Pro</h1>
+            <h1>⏱️ Time Tracker Pro</h1>
             <div id="currentDate"></div>
         </header>
 
-        <!-- Active Timer Section -->
         <div id="activeTimer" class="hidden">
             <div class="active-card">
                 <div class="location-name" id="activeLocation"></div>
@@ -32,54 +30,52 @@
             </div>
         </div>
 
-        <!-- Global Search -->
         <div id="globalSearchSection">
             <div class="search-header">
-                <button id="clearSearchBtn" class="btn-back hidden">�?� Back</button>
+                <button id="clearSearchBtn" class="btn-back hidden">← Back</button>
                 <input type="text" id="globalSearchBox" placeholder="Search all locations..." class="search-box">
             </div>
             <div id="globalSearchResults" class="location-list hidden"></div>
         </div>
 
-        <!-- Category Selection -->
         <div id="categorySelection">
             <div id="categoryList" class="category-list"></div>
         </div>
 
-        <!-- Location Selection -->
         <div id="locationSelection" class="hidden">
-            <button id="backBtn" class="btn-back">�?� Back to Categories</button>
+            <button id="backBtn" class="btn-back">← Back to Categories</button>
             <div id="locationList" class="location-list"></div>
         </div>
 
-        <!-- Location Details -->
         <div id="locationDetails" class="hidden">
-            <button id="backFromDetailsBtn" class="btn-back">�?� Back</button>
+            <button id="backFromDetailsBtn" class="btn-back">← Back</button>
             <div class="details-card">
                 <div class="details-location" id="detailsLocation"></div>
                 <div class="details-code" id="detailsChargeCode"></div>
                 <div id="detailsAddress" class="details-address"></div>
                 <div class="details-buttons">
-                    <button class="btn btn-email" onclick="emailDispatchStart()">&#128231; Email Dispatch to Start</button>
-                    <button class="btn btn-primary" onclick="confirmStartTimer()">&#9654; Start Timer</button>
+                    <button class="btn btn-email" onclick="emailDispatchStart()">📧 Email Dispatch to Start</button>
+                    <button class="btn btn-primary" onclick="confirmStartTimer()">▶ Start Timer</button>
                 </div>
             </div>
         </div>
 
-        <!-- Today's Entries -->
         <div id="todaySection">
             <h2>Today's Entries</h2>
             <div id="entriesList"></div>
             <div id="totalHours"></div>
-            <button id="viewPastBtn" class="btn btn-secondary">�??? View Past Entries</button>
-            <button id="exportDataBtn" class="btn btn-secondary">�??� Export Backup</button>
-            <button id="importDataBtn" class="btn btn-secondary">�??? Import Backup</button>
+            <button id="viewPastBtn" class="btn btn-secondary">📅 View Past Entries</button>
+            <button id="exportDataBtn" class="btn btn-secondary">💾 Export Backup</button>
+            <button id="importDataBtn" class="btn btn-secondary">📂 Import Backup</button>
         </div>
         
-        <!-- Calendar/Past Entries View -->
         <div id="calendarView" class="hidden">
-            <button id="backFromCalendarBtn" class="btn-back">�?� Back to Today</button>
+            <button id="backFromCalendarBtn" class="btn-back">← Back to Today</button>
             <h2>Past Entries</h2>
+            <div class="past-search-section">
+                <input type="text" id="pastSearchBox" placeholder="Search past entries..." class="search-box" oninput="searchPastEntries()">
+            </div>
+            <div id="pastSearchResults" class="hidden"></div>
             <div id="calendarContainer"></div>
             <div id="pastEntriesDetail" class="hidden">
                 <h3 id="selectedDateTitle"></h3>
@@ -87,7 +83,6 @@
             </div>
         </div>
         
-        <!-- Code Selection Modal -->
         <div id="codeModal" class="modal hidden">
             <div class="modal-content">
                 <h3>Which code to use?</h3>
@@ -99,12 +94,11 @@
                     <div class="code-label">MOS Code</div>
                     <div class="code-value" id="mosCodeValue"></div>
                 </button>
-                <button id="skipEmailBtn" class="btn btn-secondary" style="margin-top: 8px;">Skip Email & Finish</button>
+                <button id="skipEmailBtn" class="btn btn-secondary" style="margin-top: 8px;">Skip Email &amp; Finish</button>
                 <button id="cancelCodeModal" class="btn btn-secondary">Cancel</button>
             </div>
         </div>
         
-        <!-- Version -->
         <div class="site-link"><a href="https://nemhello.github.io/Time-Tracker-Pro/" target="_blank">nemhello.github.io/Time-Tracker-Pro</a></div>
         <div class="version">v4.1</div>
     </div>
@@ -112,7 +106,6 @@
     <script src="locations.js"></script>
     <script src="app.js"></script>
     <script>
-        // Register service worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('service-worker.js');
         }
