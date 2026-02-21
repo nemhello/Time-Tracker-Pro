@@ -5,6 +5,7 @@
 
 let locationPhotos = {}, currentLocationPhotos = [], photoViewMode = false;
 let photoDB = null;
+let addressOverrides = {};
 
 // State
 let entries = [];
@@ -120,6 +121,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 100);
 
     loadEntries();
+    loadAddressOverrides();
     renderCategories();
     renderEntries();
     updateCurrentDate();
@@ -145,6 +147,45 @@ function saveActiveEntry() {
     } else {
         localStorage.removeItem('activeEntry');
     }
+}
+
+// ── Address Overrides ────────────────────────────────────────
+function loadAddressOverrides() {
+    const stored = localStorage.getItem('addressOverrides');
+    addressOverrides = stored ? JSON.parse(stored) : {};
+}
+
+function saveAddressOverrides() {
+    localStorage.setItem('addressOverrides', JSON.stringify(addressOverrides));
+}
+
+function getAddress(locationName, staticAddress) {
+    return addressOverrides[locationName] !== undefined ? addressOverrides[locationName] : (staticAddress || '');
+}
+
+function editAddress() {
+    const current = getAddress(selectedLocation.name, selectedLocation.address);
+    const newAddr = prompt(`Edit address for ${selectedLocation.name}:\n(Leave blank to remove)`, current);
+    if (newAddr === null) return; // cancelled
+
+    if (newAddr.trim() === '') {
+        delete addressOverrides[selectedLocation.name];
+    } else {
+        addressOverrides[selectedLocation.name] = newAddr.trim();
+    }
+    saveAddressOverrides();
+
+    // Update selectedLocation so timer/email picks it up
+    selectedLocation.address = getAddress(selectedLocation.name, selectedLocation.address);
+
+    // Show reminder banner
+    const overrideCount = Object.keys(addressOverrides).length;
+    if (overrideCount > 0) {
+        const msg = `✔ Address saved!\n\n📌 Reminder: You have ${overrideCount} custom address${overrideCount !== 1 ? 'es' : ''} stored locally.\nTo make permanent, update locations.js in your repo.`;
+        alert(msg);
+    }
+
+    renderLocationDetailsView();
 }
 
 // Legacy localStorage photo fallback
@@ -300,12 +341,18 @@ function renderLocationDetailsView() {
     document.getElementById('detailsLocation').textContent = selectedLocation.name;
     document.getElementById('detailsChargeCode').textContent = selectedLocation.chargeCodeSZ || 'No charge code';
 
+    const resolvedAddress = getAddress(selectedLocation.name, selectedLocation.address);
     const addressDiv = document.getElementById('detailsAddress');
-    if (selectedLocation.address && selectedLocation.address.trim() !== '') {
-        addressDiv.innerHTML = `<a href="https://maps.apple.com/?q=${encodeURIComponent(selectedLocation.address)}" target="_blank">📍 ${selectedLocation.address}</a>`;
+    if (resolvedAddress && resolvedAddress.trim() !== '') {
+        addressDiv.innerHTML = `
+            <div class="address-container">
+                <a class="address-link" href="https://maps.apple.com/?q=${encodeURIComponent(resolvedAddress)}" target="_blank">📍 ${resolvedAddress}</a>
+                <button class="btn-edit-address" onclick="editAddress()">Edit</button>
+            </div>`;
         addressDiv.style.display = 'block';
     } else {
-        addressDiv.style.display = 'none';
+        addressDiv.innerHTML = `<button class="btn-add-address" onclick="editAddress()">+ Add Address</button>`;
+        addressDiv.style.display = 'block';
     }
 
     const buttonsDiv = document.querySelector('#locationDetails .details-buttons');
@@ -647,7 +694,7 @@ function confirmStartTimer() {
         location: selectedLocation.name,
         chargeCodeSZ: selectedLocation.chargeCodeSZ,
         chargeCodeMOS: selectedLocation.chargeCodeMOS,
-        address: selectedLocation.address,
+        address: getAddress(selectedLocation.name, selectedLocation.address),
         startTime: now.toISOString(),
         endTime: null,
         notes: ''
@@ -1014,8 +1061,9 @@ async function exportData() {
     const data = {
         entries,
         photos: allPhotos,
+        addressOverrides,
         exportDate: new Date().toISOString(),
-        version: 'v4.1.0-local'
+        version: 'v4.1.1'
     };
 
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1051,6 +1099,11 @@ async function importData() {
 
                 entries = data.entries;
                 saveEntries();
+
+                if (data.addressOverrides) {
+                    addressOverrides = data.addressOverrides;
+                    saveAddressOverrides();
+                }
 
                 if (data.photos && photoDB) {
                     await clearAllPhotosFromDB();
