@@ -1244,9 +1244,8 @@ function exportData() {
     const data = {
         entries: entries,
         photos: locationPhotos,
-        addressOverrides: addressOverrides,
         exportDate: new Date().toISOString(),
-        version: 'v4.1'
+        version: 'v4.0.0-pro'
     };
     
     const dataStr = JSON.stringify(data, null, 2);
@@ -1262,7 +1261,7 @@ function exportData() {
     a.click();
     
     URL.revokeObjectURL(url);
-    alert(`✓ Backup saved: ${filename}\n\nIncludes time entries, photos, and address overrides.`);
+    alert(`âœ“ Backup saved: ${filename}\n\nIncludes time entries and photo metadata.`);
 }
 
 function importData() {
@@ -1295,13 +1294,8 @@ function importData() {
                         savePhotos();
                     }
                     
-                    if (data.addressOverrides) {
-                        addressOverrides = data.addressOverrides;
-                        saveAddressOverrides();
-                    }
-
                     renderEntries();
-                    alert(`✓ Imported ${entries.length} entries successfully!`);
+                    alert(`âœ“ Imported ${entries.length} entries successfully!`);
                 }
             } catch (err) {
                 alert('âŒ Error reading backup file: ' + err.message);
