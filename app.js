@@ -286,6 +286,17 @@ function renderLocationDetailsView() {
     const photoCount = currentLocationPhotos.length;
     const lastVisit = getLastVisitDate(selectedLocation.name);
 
+    // Always rebuild card to recover from showPhotoGallery() wiping it
+    const detailsCard = document.querySelector('#locationDetails .details-card');
+    if (detailsCard) {
+        detailsCard.innerHTML = `
+            <div class="details-location" id="detailsLocation"></div>
+            <div class="details-code" id="detailsChargeCode"></div>
+            <div id="detailsAddress" class="details-address"></div>
+            <div class="details-buttons"></div>
+        `;
+    }
+
     document.getElementById('detailsLocation').textContent = selectedLocation.name;
     document.getElementById('detailsChargeCode').textContent = selectedLocation.chargeCodeSZ || 'No charge code';
 
@@ -298,26 +309,24 @@ function renderLocationDetailsView() {
     }
 
     const buttonsDiv = document.querySelector('#locationDetails .details-buttons');
-    if (buttonsDiv) {
-        let html = '';
+    let html = '';
 
-        if (lastVisit && photoCount > 0) {
-            html += `<div class="photo-info-banner">Last visit: ${lastVisit} &bull; ${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>`;
-        }
-
-        if (photoCount > 0) {
-            html += `<button class="btn btn-primary" onclick="togglePhotoView()">&#128248; View Photos (${photoCount})</button>`;
-        } else {
-            html += `<button class="btn btn-primary" onclick="togglePhotoView()">&#128247; Add Photos</button>`;
-        }
-
-        html += `
-            <button class="btn btn-email" onclick="emailDispatchStart()">&#128231; Email Dispatch to Start</button>
-            <button class="btn btn-primary" onclick="confirmStartTimer()">&#9654; Start Timer</button>
-        `;
-
-        buttonsDiv.innerHTML = html;
+    if (lastVisit && photoCount > 0) {
+        html += `<div class="photo-info-banner">Last visit: ${lastVisit} &bull; ${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>`;
     }
+
+    if (photoCount > 0) {
+        html += `<button class="btn btn-primary" onclick="togglePhotoView()">&#128248; View Photos (${photoCount})</button>`;
+    } else {
+        html += `<button class="btn btn-primary" onclick="togglePhotoView()">&#128247; Add Photos</button>`;
+    }
+
+    html += `
+        <button class="btn btn-email" onclick="emailDispatchStart()">&#128231; Email Dispatch to Start</button>
+        <button class="btn btn-primary" onclick="confirmStartTimer()">&#9654; Start Timer</button>
+    `;
+
+    buttonsDiv.innerHTML = html;
 }
 
 function getLastVisitDate(locationName) {
