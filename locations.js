@@ -142,6 +142,8 @@ const CATEGORIES = {
         { name: "AIS Logging Dispatch Co-Located with Master Site", chargeCodeSZ: "SZ02B04D105", chargeCodeMOS: "", address: "" },
         { name: "Tower Park (CCGW Only)", chargeCodeSZ: "SZ02B04D14", chargeCodeMOS: "", address: "" },
         { name: "Training", chargeCodeSZ: "", chargeCodeMOS: "", address: "" },
+        { name: "Miscellaneous", chargeCodeSZ: "", chargeCodeMOS: "", address: "" }
+
     ],
     "Lees Summit": [
         { name: "Every RF Sub-Site", chargeCodeSZ: "SZ02B040702", chargeCodeMOS: "", address: "" },
