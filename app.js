@@ -1160,21 +1160,35 @@ async function exportData() {
         photos: allPhotos,
         addressOverrides: addressOverrides,
         exportDate: new Date().toISOString(),
-        version: 'v4.5.0'
+        version: 'v4.5.2'
     };
     
     const dataStr = JSON.stringify(data, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
     const date = new Date().toISOString().split('T')[0];
     const filename = `time-tracker-backup-${date}.json`;
-    
+    const file = new File([dataStr], filename, { type: 'application/json' });
+
+    // Use Web Share API on iOS (triggers "Save to Files")
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+            await navigator.share({
+                files: [file],
+                title: 'Time Tracker Backup'
+            });
+            return;
+        } catch (err) {
+            if (err.name === 'AbortError') return; // user cancelled
+        }
+    }
+
+    // Fallback for non-iOS / desktop
+    const url = URL.createObjectURL(file);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    alert(`✅ Backup saved: ${filename}\n\nIncludes ${entries.length} entries and ${allPhotos.length} photos.`);
+    alert(`✅ Backup saved: ${filename}\n\n${entries.length} entries, ${allPhotos.length} photos.`);
 }
 
 function importData() {
