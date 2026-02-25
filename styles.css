@@ -1236,32 +1236,32 @@ header h1 {
    ============================================ */
 
 #gpsLogSection {
-    padding: 0 20px 10px 20px;
+    padding: 0;
 }
 
 .gps-log-bar {
-    display: flex;
-    gap: 10px;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
 }
 
 .btn-log-location {
-    flex: 1;
     background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
     color: white;
     border: none;
     border-radius: 12px;
-    padding: 16px;
-    font-size: 17px;
-    font-weight: 700;
+    padding: 20px;
+    font-size: 20px;
+    font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+    text-align: center;
     transition: all 0.2s;
 }
 
 .btn-log-location:active {
-    transform: scale(0.97);
-    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+    transform: scale(0.98);
+    box-shadow: 0 1px 4px rgba(124, 58, 237, 0.3);
 }
 
 .btn-log-location:disabled {
@@ -1270,20 +1270,22 @@ header h1 {
 }
 
 .btn-view-log {
-    background: rgba(124, 58, 237, 0.12);
+    background: white;
     color: #7c3aed;
-    border: 2px solid rgba(124, 58, 237, 0.3);
+    border: none;
     border-radius: 12px;
-    padding: 12px 16px;
-    font-size: 14px;
+    padding: 20px;
+    font-size: 20px;
     font-weight: 600;
     cursor: pointer;
-    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    text-align: center;
     transition: all 0.2s;
 }
 
 .btn-view-log:active {
-    background: rgba(124, 58, 237, 0.2);
+    transform: scale(0.98);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
 }
 
 .gps-status {
@@ -1446,4 +1448,24 @@ header h1 {
     color: #9ca3af;
     padding: 40px 20px;
     font-size: 15px;
+}
+
+.btn-log-location .category-name {
+    color: white;
+    font-size: 20px;
+}
+
+.btn-log-location .category-count {
+    color: rgba(255,255,255,0.75);
+    font-size: 13px;
+}
+
+.btn-view-log .category-name {
+    color: #7c3aed;
+    font-size: 20px;
+}
+
+.btn-view-log .category-count {
+    color: #a78bfa;
+    font-size: 13px;
 }

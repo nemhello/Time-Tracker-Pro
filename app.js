@@ -1460,7 +1460,6 @@ async function logCurrentLocation() {
 }
 
 function showLocationLog() {
-    document.getElementById('gpsLogSection').classList.add('hidden');
     document.getElementById('globalSearchSection').classList.add('hidden');
     document.getElementById('categorySelection').classList.add('hidden');
     document.getElementById('todaySection').classList.add('hidden');
@@ -1470,7 +1469,6 @@ function showLocationLog() {
 
 function hideLocationLog() {
     document.getElementById('locationLogView').classList.add('hidden');
-    document.getElementById('gpsLogSection').classList.remove('hidden');
     document.getElementById('globalSearchSection').classList.remove('hidden');
     document.getElementById('categorySelection').classList.remove('hidden');
     document.getElementById('todaySection').classList.remove('hidden');

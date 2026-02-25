@@ -30,21 +30,6 @@
             </div>
         </div>
 
-        <!-- GPS LOG SECTION -->
-        <div id="gpsLogSection">
-            <div class="gps-log-bar">
-                <button id="logLocationBtn" class="btn-log-location">
-                    <div class="category-name">📍 Log My Location</div>
-                    <div class="category-count">Tap to record GPS</div>
-                </button>
-                <button id="viewLogBtn" class="btn-view-log">
-                    <div class="category-name">📋 View Log</div>
-                    <div class="category-count">History &amp; SMS</div>
-                </button>
-            </div>
-            <div id="gpsStatus" class="gps-status hidden"></div>
-        </div>
-
         <!-- LOCATION LOG VIEW -->
         <div id="locationLogView" class="hidden">
             <div class="log-header">
@@ -68,6 +53,19 @@
         </div>
 
         <div id="categorySelection">
+            <div class="category-list">
+                <div class="gps-log-bar">
+                    <button id="logLocationBtn" class="btn-log-location">
+                        <div class="category-name">📍 Log My Location</div>
+                        <div class="category-count">Tap to record GPS</div>
+                    </button>
+                    <button id="viewLogBtn" class="btn-view-log">
+                        <div class="category-name">📋 View Log</div>
+                        <div class="category-count">History &amp; SMS</div>
+                    </button>
+                </div>
+                <div id="gpsStatus" class="gps-status hidden"></div>
+            </div>
             <div id="categoryList" class="category-list"></div>
         </div>
 

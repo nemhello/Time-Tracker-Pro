@@ -1,4 +1,4 @@
-const CACHE_NAME = 'time-tracker-pro-v4.0';
+const CACHE_NAME = 'time-tracker-pro-v4.3';
 const urlsToCache = [
   '/Time-Tracker-Pro/',
   '/Time-Tracker-Pro/index.html',
@@ -12,13 +12,7 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(urlsToCache))
-  );
-});
-
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
+      .then(() => self.skipWaiting())  // activate immediately, don't wait
   );
 });
 
@@ -28,10 +22,17 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
+            return caches.delete(cacheName);  // purge old caches
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())  // take control of open tabs immediately
+  );
+});
+
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => response || fetch(event.request))
   );
 });
