@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadEntries();
     loadPhotos();
     loadAddressOverrides();
+    loadLocationLog();
     renderCategories();
     renderEntries();
     updateCurrentDate();
@@ -1203,6 +1204,12 @@ function setupEventListeners() {
     document.getElementById('useMOSCode').addEventListener('click', () => handleCodeSelection('MOS'));
     document.getElementById('skipEmailBtn').addEventListener('click', skipEmailAndFinish);
     document.getElementById('cancelCodeModal').addEventListener('click', hideCodeModal);
+
+    document.getElementById('logLocationBtn').addEventListener('click', logCurrentLocation);
+    document.getElementById('viewLogBtn').addEventListener('click', showLocationLog);
+    document.getElementById('backFromLogBtn').addEventListener('click', hideLocationLog);
+    document.getElementById('smsLogBtn').addEventListener('click', smsLocationLog);
+    document.getElementById('clearLogBtn').addEventListener('click', clearLocationLog);
     
     const workOrderField = document.getElementById('workOrderField');
     if (workOrderField) {
@@ -1365,4 +1372,167 @@ async function showLoginPrompt() {
     } catch { 
         return false; 
     }
+}
+
+// ============================================
+// GPS LOCATION LOG
+// ============================================
+
+let locationLog = [];
+
+function loadLocationLog() {
+    const stored = localStorage.getItem('locationLog');
+    locationLog = stored ? JSON.parse(stored) : [];
+    const saved = localStorage.getItem('smsPhone');
+    if (saved) document.getElementById('smsPhoneInput').value = saved;
+}
+
+function saveLocationLog() {
+    localStorage.setItem('locationLog', JSON.stringify(locationLog));
+}
+
+function showGpsStatus(msg, type) {
+    const el = document.getElementById('gpsStatus');
+    el.textContent = msg;
+    el.className = `gps-status ${type}`;
+    el.classList.remove('hidden');
+    if (type === 'success') setTimeout(() => el.classList.add('hidden'), 3000);
+}
+
+async function logCurrentLocation() {
+    const btn = document.getElementById('logLocationBtn');
+    btn.disabled = true;
+    showGpsStatus('Getting GPS...', 'resolving');
+
+    if (!navigator.geolocation) {
+        showGpsStatus('GPS not supported on this device.', 'error');
+        btn.disabled = false;
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+            const { latitude, longitude, accuracy } = pos.coords;
+            showGpsStatus('Resolving address...', 'resolving');
+
+            let address = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+
+            try {
+                const res = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+                    { headers: { 'Accept-Language': 'en' } }
+                );
+                const data = await res.json();
+                if (data && data.display_name) {
+                    // Trim to street + city level
+                    const parts = data.display_name.split(',').map(s => s.trim());
+                    address = parts.slice(0, 4).join(', ');
+                }
+            } catch (e) {
+                // fall back to coords
+            }
+
+            const entry = {
+                id: Date.now(),
+                timestamp: new Date().toISOString(),
+                address,
+                lat: latitude,
+                lon: longitude,
+                accuracy: Math.round(accuracy)
+            };
+
+            locationLog.unshift(entry);
+            saveLocationLog();
+            showGpsStatus(`✓ Logged: ${address}`, 'success');
+            btn.disabled = false;
+        },
+        (err) => {
+            const msgs = {
+                1: 'Location permission denied. Check browser settings.',
+                2: 'GPS signal unavailable.',
+                3: 'GPS timed out. Try again.'
+            };
+            showGpsStatus(msgs[err.code] || 'GPS error.', 'error');
+            btn.disabled = false;
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+}
+
+function showLocationLog() {
+    document.getElementById('gpsLogSection').classList.add('hidden');
+    document.getElementById('globalSearchSection').classList.add('hidden');
+    document.getElementById('categorySelection').classList.add('hidden');
+    document.getElementById('todaySection').classList.add('hidden');
+    document.getElementById('locationLogView').classList.remove('hidden');
+    renderLocationLog();
+}
+
+function hideLocationLog() {
+    document.getElementById('locationLogView').classList.add('hidden');
+    document.getElementById('gpsLogSection').classList.remove('hidden');
+    document.getElementById('globalSearchSection').classList.remove('hidden');
+    document.getElementById('categorySelection').classList.remove('hidden');
+    document.getElementById('todaySection').classList.remove('hidden');
+}
+
+function renderLocationLog() {
+    const list = document.getElementById('locationLogList');
+    if (locationLog.length === 0) {
+        list.innerHTML = '<div class="log-empty">No locations logged yet.<br>Tap "Log My Location" to start.</div>';
+        return;
+    }
+
+    list.innerHTML = locationLog.map(entry => {
+        const dt = new Date(entry.timestamp);
+        const dateStr = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        const timeStr = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        return `
+            <div class="log-entry">
+                <div class="log-entry-info">
+                    <div class="log-entry-time">${dateStr} ${timeStr} · ±${entry.accuracy}m</div>
+                    <div class="log-entry-address">${entry.address}</div>
+                    <div class="log-entry-coords">${entry.lat.toFixed(5)}, ${entry.lon.toFixed(5)}</div>
+                </div>
+                <button class="btn-delete-log" onclick="deleteLogEntry(${entry.id})">✕</button>
+            </div>
+        `;
+    }).join('');
+}
+
+function deleteLogEntry(id) {
+    locationLog = locationLog.filter(e => e.id !== id);
+    saveLocationLog();
+    renderLocationLog();
+}
+
+function clearLocationLog() {
+    if (!confirm('Clear all location log entries?')) return;
+    locationLog = [];
+    saveLocationLog();
+    renderLocationLog();
+}
+
+function smsLocationLog() {
+    const phone = document.getElementById('smsPhoneInput').value.trim();
+    if (!phone) {
+        alert('Enter a phone number first.');
+        return;
+    }
+    if (locationLog.length === 0) {
+        alert('No log entries to send.');
+        return;
+    }
+
+    localStorage.setItem('smsPhone', phone);
+
+    const body = locationLog.map(entry => {
+        const dt = new Date(entry.timestamp);
+        const dateStr = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const timeStr = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        return `${dateStr} ${timeStr}\n${entry.address}`;
+    }).join('\n\n');
+
+    const smsBody = encodeURIComponent(`Location Log:\n\n${body}`);
+    window.location.href = `sms:${phone}?body=${smsBody}`;
 }
