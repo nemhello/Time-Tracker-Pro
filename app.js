@@ -1252,7 +1252,7 @@ function exportData() {
         entries: entries,
         photos: locationPhotos,
         exportDate: new Date().toISOString(),
-        version: 'v4.0.0-pro'
+        version: 'v4.3.0'
     };
     
     const dataStr = JSON.stringify(data, null, 2);
