@@ -19,7 +19,6 @@ let activeEntry = null;
 let timerInterval = null;
 let selectedCategory = null;
 let selectedLocation = null;
-let pendingCodeSelection = null;
 let currentCalendarDate = new Date();
 let addressOverrides = {};
 let lastViewedDate = null;
@@ -583,29 +582,13 @@ function hideCodeModal() {
 function handleCodeSelection(codeType) {
     const code = codeType === 'SZ' ? selectedLocation.chargeCodeSZ : selectedLocation.chargeCodeMOS;
     if (!code) return;
-    
-    const action = pendingCodeSelection;
     hideCodeModal();
-    
-    if (action === 'start') {
-        sendStartEmail(code);
-    } else if (action === 'stop') {
-        sendStopEmail(code);
-        setTimeout(() => {
-            finishEntry();
-        }, 300);
-    }
+    sendStartEmail(code);
 }
 
 function sendStartEmail(code) {
     const subject = code;
     const body = `Please open a ticket to start work at ${selectedLocation.name}`;
-    window.location.href = `mailto:dispatch@motorolasolutions.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
-function sendStopEmail(code) {
-    const subject = code;
-    const body = `All work at ${selectedLocation.name} is finished, please close this ticket.`;
     window.location.href = `mailto:dispatch@motorolasolutions.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
@@ -689,24 +672,17 @@ function stopTimer() {
     activeEntry.workOrder = document.getElementById('workOrderField').value.trim();
     activeEntry.notes = document.getElementById('notesField').value;
     
-    if (activeEntry.location === 'Training') {
-        entries.push(activeEntry);
-        saveEntries();
-        activeEntry = null;
-        saveActiveEntry();
-        hideActiveTimer();
-        renderEntries();
-        return;
+    entries.push(activeEntry);
+    saveEntries();
+    const locationName = activeEntry.location;
+    activeEntry = null;
+    saveActiveEntry();
+    hideActiveTimer();
+    renderEntries();
+
+    if (locationName !== 'Training') {
+        showCloseTicketBanner();
     }
-    
-    selectedLocation = {
-        name: activeEntry.location,
-        chargeCodeSZ: activeEntry.chargeCodeSZ,
-        chargeCodeMOS: activeEntry.chargeCodeMOS,
-        address: activeEntry.address
-    };
-    
-    showCodeModal('stop');
 }
 
 function finishEntry() {
@@ -719,6 +695,23 @@ function finishEntry() {
     hideActiveTimer();
     renderEntries();
 }
+
+function showCloseTicketBanner() {
+    const existing = document.getElementById('closeTicketBanner');
+    if (existing) existing.remove();
+
+    const banner = document.createElement('div');
+    banner.id = 'closeTicketBanner';
+    banner.className = 'close-ticket-banner';
+    banner.innerHTML = `
+        <div class="close-ticket-content">
+            <span>🎫 Remember to close your ticket in Motorola</span>
+            <button onclick="document.getElementById('closeTicketBanner').remove()">✕</button>
+        </div>
+    `;
+    document.getElementById('todaySection').insertAdjacentElement('beforebegin', banner);
+}
+
 
 function hideActiveTimer() {
     document.getElementById('activeTimer').classList.add('hidden');
@@ -1123,7 +1116,6 @@ function setupEventListeners() {
     
     document.getElementById('useSZCode').addEventListener('click', () => handleCodeSelection('SZ'));
     document.getElementById('useMOSCode').addEventListener('click', () => handleCodeSelection('MOS'));
-    document.getElementById('skipEmailBtn').addEventListener('click', skipEmailAndFinish);
     document.getElementById('cancelCodeModal').addEventListener('click', hideCodeModal);
 
     document.getElementById('logLocationBtn').addEventListener('click', logCurrentLocation);
@@ -1153,13 +1145,6 @@ function setupEventListeners() {
     }
 }
 
-function skipEmailAndFinish() {
-    const action = pendingCodeSelection;
-    hideCodeModal();
-    if (action === 'stop') {
-        finishEntry();
-    }
-}
 
 function updateCurrentDate() {
     const dateDiv = document.getElementById('currentDate');
@@ -1175,7 +1160,7 @@ async function exportData() {
         photos: allPhotos,
         addressOverrides: addressOverrides,
         exportDate: new Date().toISOString(),
-        version: 'v4.4.0'
+        version: 'v4.5.0'
     };
     
     const dataStr = JSON.stringify(data, null, 2);
