@@ -1,7 +1,17 @@
-const CONFIG = { apiUrl: 'https://api.wilkerson-labs.com' };
-let authToken = localStorage.getItem('authToken');
-let authExpiry = localStorage.getItem('authExpiry');
-let locationPhotos = {}, currentLocationPhotos = [], photoViewMode = false;
+let photoDB = null;
+let currentLocationPhotos = [], photoViewMode = false;
+
+// IndexedDB init
+function initPhotoDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open('TimeTrackerPhotos', 1);
+        req.onupgradeneeded = e => {
+            e.target.result.createObjectStore('photos', { keyPath: 'id' });
+        };
+        req.onsuccess = e => { photoDB = e.target.result; resolve(); };
+        req.onerror = () => reject(req.error);
+    });
+}
 
 // State
 let entries = [];
@@ -16,8 +26,7 @@ let lastViewedDate = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-    const isAuth = await checkAuthentication();
-    if (!isAuth) await showLoginPrompt();
+    await initPhotoDB();
     if (typeof CATEGORIES === 'undefined') {
         console.error('CRITICAL: CATEGORIES not loaded!');
         alert('ERROR: Location data failed to load. Please refresh.');
@@ -37,7 +46,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 100);
     
     loadEntries();
-    loadPhotos();
     loadAddressOverrides();
     loadLocationLog();
     renderCategories();
@@ -60,13 +68,57 @@ function saveEntries() {
     localStorage.setItem('timeEntries', JSON.stringify(entries));
 }
 
-function loadPhotos() {
-    const stored = localStorage.getItem('locationPhotos');
-    locationPhotos = stored ? JSON.parse(stored) : {};
+function getLocationPhotos(locationName) {
+    return currentLocationPhotos; // populated per-location on demand
 }
 
-function savePhotos() {
-    localStorage.setItem('locationPhotos', JSON.stringify(locationPhotos));
+async function loadLocationPhotos(locationName) {
+    if (!photoDB) return [];
+    return new Promise(resolve => {
+        const tx = photoDB.transaction('photos', 'readonly');
+        const store = tx.objectStore('photos');
+        const req = store.getAll();
+        req.onsuccess = () => resolve((req.result || []).filter(p => p.location === locationName).sort((a,b) => b.timestamp - a.timestamp));
+        req.onerror = () => resolve([]);
+    });
+}
+
+async function savePhotoToDB(photoData) {
+    if (!photoDB) return;
+    return new Promise(resolve => {
+        const tx = photoDB.transaction('photos', 'readwrite');
+        tx.objectStore('photos').put(photoData);
+        tx.oncomplete = resolve;
+    });
+}
+
+async function deletePhotoFromDB(photoId) {
+    if (!photoDB) return;
+    return new Promise(resolve => {
+        const tx = photoDB.transaction('photos', 'readwrite');
+        tx.objectStore('photos').delete(photoId);
+        tx.oncomplete = resolve;
+    });
+}
+
+async function getAllPhotosForExport() {
+    if (!photoDB) return [];
+    return new Promise(resolve => {
+        const tx = photoDB.transaction('photos', 'readonly');
+        const req = tx.objectStore('photos').getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => resolve([]);
+    });
+}
+
+async function getPhotoCountForLocation(locationName) {
+    if (!photoDB) return 0;
+    return new Promise(resolve => {
+        const tx = photoDB.transaction('photos', 'readonly');
+        const req = tx.objectStore('photos').getAll();
+        req.onsuccess = () => resolve((req.result || []).filter(p => p.location === locationName).length);
+        req.onerror = () => resolve(0);
+    });
 }
 
 function loadAddressOverrides() {
@@ -190,7 +242,7 @@ function backToCategories() {
 }
 
 // Location List - WITH PHOTO COUNTS
-function renderLocationList() {
+async function renderLocationList() {
     const list = document.getElementById('locationList');
     
     if (!selectedCategory) {
@@ -205,30 +257,25 @@ function renderLocationList() {
         return;
     }
     
-    list.innerHTML = locations.map(loc => {
-        const photoCount = getLocationPhotos(loc.name).length;
-        const photoIndicator = photoCount > 0 ? ` ðŸ“¸ ${photoCount}` : '';
-        
-        return `
-        <div class="location-item" onclick="showLocationDetails('${escapeHtml(loc.name)}', '${escapeHtml(loc.chargeCodeSZ)}', '${escapeHtml(loc.chargeCodeMOS)}', '${escapeHtml(loc.address || '')}', '${escapeHtml(selectedCategory)}')">
+    const items = await Promise.all(locations.map(async loc => {
+        const photoCount = await getPhotoCountForLocation(loc.name);
+        const photoIndicator = photoCount > 0 ? ` 📸 ${photoCount}` : '';
+        return `<div class="location-item" onclick="showLocationDetails('${escapeHtml(loc.name)}', '${escapeHtml(loc.chargeCodeSZ)}', '${escapeHtml(loc.chargeCodeMOS)}', '${escapeHtml(loc.address || '')}', '${escapeHtml(selectedCategory)}')">
             <div class="loc-name">${loc.name}${photoIndicator}</div>
             <div class="loc-code">${loc.chargeCodeSZ || 'No code'}</div>
             ${loc.address && loc.address.trim() !== '' ? `<div class="loc-address">${loc.address}</div>` : ''}
-        </div>
-    `;
-    }).join('');
+        </div>`;
+    }));
+    list.innerHTML = items.join('');
 }
 
 // Location Details - WITH PHOTO BUTTON
-function showLocationDetails(name, chargeCodeSZ, chargeCodeMOS, address, category) {
+async function showLocationDetails(name, chargeCodeSZ, chargeCodeMOS, address, category) {
     selectedLocation = { name, chargeCodeSZ, chargeCodeMOS, address, category };
-    currentLocationPhotos = getLocationPhotos(name);
+    currentLocationPhotos = await loadLocationPhotos(name);
     photoViewMode = false;
     
-    if (name === 'Training') {
-        confirmStartTimer();
-        return;
-    }
+    if (name === 'Training') { confirmStartTimer(); return; }
     
     document.getElementById('locationSelection').classList.add('hidden');
     document.getElementById('globalSearchSection').classList.add('hidden');
@@ -245,35 +292,37 @@ function renderLocationDetailsView() {
     const lastVisit = getLastVisitDate(selectedLocation.name);
     const effectiveAddress = getEffectiveAddress(selectedLocation.name, selectedLocation.address);
     
-    document.getElementById('detailsLocation').textContent = selectedLocation.name;
-    document.getElementById('detailsChargeCode').textContent = selectedLocation.chargeCodeSZ || 'No charge code';
+    // Rebuild full card so it works after showPhotoGallery replaces innerHTML
+    const detailsCard = document.querySelector('#locationDetails .details-card');
+    if (!detailsCard) return;
     
-    const addressDiv = document.getElementById('detailsAddress');
+    let addrHtml;
     if (effectiveAddress && effectiveAddress.trim() !== '') {
-        addressDiv.innerHTML = `<div class="address-container"><a href="https://maps.apple.com/?q=${encodeURIComponent(effectiveAddress)}" target="_blank" class="address-link">&#128205; ${effectiveAddress}</a><button class="btn-edit-address" onclick="editAddress()">Edit</button></div>`;
-        addressDiv.style.display = 'block';
+        addrHtml = `<div id="detailsAddress" class="details-address" style="display:block"><div class="address-container"><a href="https://maps.apple.com/?q=${encodeURIComponent(effectiveAddress)}" target="_blank" class="address-link">&#128205; ${effectiveAddress}</a><button class="btn-edit-address" onclick="editAddress()">Edit</button></div></div>`;
     } else {
-        addressDiv.innerHTML = `<button class="btn-add-address" onclick="editAddress()">+ Add Address</button>`;
-        addressDiv.style.display = 'block';
+        addrHtml = `<div id="detailsAddress" class="details-address" style="display:block"><button class="btn-add-address" onclick="editAddress()">+ Add Address</button></div>`;
     }
     
-    const buttonsDiv = document.querySelector('#locationDetails .details-buttons');
-    if (buttonsDiv) {
-        let html = '';
-        if (lastVisit && photoCount > 0) {
-            html += `<div class="photo-info-banner">Last visit: ${lastVisit} &bull; ${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>`;
-        }
-        if (authToken && photoCount > 0) {
-            html += `<button class="btn btn-primary" onclick="togglePhotoView()">📸 View Photos (${photoCount})</button>`;
-        } else if (authToken) {
-            html += `<button class="btn btn-primary" onclick="togglePhotoView()">📷 Add Photos</button>`;
-        }
-        html += `
+    let photoBtns = '';
+    if (lastVisit && photoCount > 0) {
+        photoBtns += `<div class="photo-info-banner">Last visit: ${lastVisit} &bull; ${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>`;
+    }
+    if (photoCount > 0) {
+        photoBtns += `<button class="btn btn-primary" onclick="togglePhotoView()">📸 View Photos (${photoCount})</button>`;
+    } else {
+        photoBtns += `<button class="btn btn-primary" onclick="togglePhotoView()">📷 Add Photos</button>`;
+    }
+    
+    detailsCard.innerHTML = `
+        <div class="details-location" id="detailsLocation">${selectedLocation.name}</div>
+        <div class="details-code" id="detailsChargeCode">${selectedLocation.chargeCodeSZ || 'No charge code'}</div>
+        ${addrHtml}
+        <div class="details-buttons">
+            ${photoBtns}
             <button class="btn btn-email" onclick="emailDispatchStart()">📧 Email Dispatch to Start</button>
             <button class="btn btn-primary" onclick="confirmStartTimer()">▶ Start Timer</button>
-        `;
-        buttonsDiv.innerHTML = html;
-    }
+        </div>
+    `;
 }
 
 function editAddress() {
@@ -304,17 +353,7 @@ function getLastVisitDate(locationName) {
     return `${Math.floor(diffDays / 30)} months ago`;
 }
 
-function getLocationPhotos(locationName) {
-    return locationPhotos[locationName] || [];
-}
-
-function addPhotoToLocation(locationName, photoData) {
-    if (!locationPhotos[locationName]) {
-        locationPhotos[locationName] = [];
-    }
-    locationPhotos[locationName].unshift(photoData);
-    savePhotos();
-}
+// Photos stored in IndexedDB - see loadLocationPhotos, savePhotoToDB, deletePhotoFromDB
 
 function backFromDetails() {
     selectedLocation = null;
@@ -342,36 +381,25 @@ function togglePhotoView() {
 }
 
 function showPhotoGallery() {
-    if (!authToken) {
-        alert('âŒ Photo features require authentication.');
-        return;
-    }
-    
     const detailsCard = document.querySelector('#locationDetails .details-card');
     if (!detailsCard) return;
     
     detailsCard.innerHTML = `
         <div class="photo-gallery-header">
-            <h2>ðŸ“¸ ${selectedLocation.name}</h2>
+            <h2>📸 ${selectedLocation.name}</h2>
             <p>${currentLocationPhotos.length} photo${currentLocationPhotos.length !== 1 ? 's' : ''}</p>
         </div>
-        
         <div class="photo-capture-section">
-            <button class="btn-primary btn-capture" onclick="capturePhoto()">
-                ðŸ“· Take Photo
-            </button>
-            <input type="file" id="photoFileInput" accept="image/*" style="display: none;" onchange="handlePhotoFile(event)">
-            <button class="btn-secondary" onclick="document.getElementById('photoFileInput').click()">
-                ðŸ“ Upload Photo
-            </button>
+            <input type="file" id="photoCameraInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoFile(event)">
+            <input type="file" id="photoFileInput" accept="image/*" style="display:none;" onchange="handlePhotoFile(event)">
+            <button class="btn btn-primary btn-capture" onclick="document.getElementById('photoCameraInput').click()">📷 Take Photo</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('photoFileInput').click()">📁 Upload Photo</button>
         </div>
-        
         <div class="photo-gallery" id="photoGalleryGrid">
             ${renderPhotoGrid()}
         </div>
-        
         <div class="details-buttons">
-            <button class="btn-secondary" onclick="togglePhotoView()">⏱️ Back to Timer</button>
+            <button class="btn btn-secondary" onclick="togglePhotoView()">⏱️ Back to Details</button>
         </div>
     `;
 }
@@ -380,18 +408,16 @@ function renderPhotoGrid() {
     if (currentLocationPhotos.length === 0) {
         return '<div class="no-photos">No photos yet. Take your first photo!</div>';
     }
-    
     return currentLocationPhotos.map((photo, index) => `
         <div class="photo-card" onclick="viewFullPhoto(${index})">
             <img src="${photo.url}" alt="Photo ${index + 1}" loading="lazy">
             <div class="photo-overlay">
                 <div class="photo-date">${formatPhotoDate(photo.timestamp)}</div>
-                ${photo.storage === 'immich' ? 'ðŸ ' : photo.storage === 'cloudinary' ? 'â˜️' : 'ðŸ“±'}
+                📱
             </div>
         </div>
     `).join('');
 }
-
 function formatPhotoDate(timestamp) {
     const date = new Date(timestamp);
     const now = new Date();
@@ -408,150 +434,51 @@ function formatPhotoDate(timestamp) {
     return date.toLocaleDateString();
 }
 
-// Photo Capture
-async function capturePhoto() {
-    if (!authToken) {
-        alert('âŒ Photo features require authentication.');
-        return;
-    }
-    
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment' } 
-        });
-        
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.autoplay = true;
-        video.playsInline = true;
-        
-        const overlay = document.createElement('div');
-        overlay.className = 'camera-overlay';
-        overlay.innerHTML = `
-            <div class="camera-container">
-                <div class="camera-preview"></div>
-                <div class="camera-controls">
-                    <button class="btn-secondary" id="cancelCapture">Cancel</button>
-                    <button class="btn-primary" id="captureButton">ðŸ“· Capture</button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(overlay);
-        const preview = overlay.querySelector('.camera-preview');
-        preview.appendChild(video);
-        
-        await new Promise((resolve) => {
-            video.onloadedmetadata = () => {
-                video.play();
-                resolve();
-            };
-        });
-        
-        document.getElementById('captureButton').onclick = async () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0);
-            
-            stream.getTracks().forEach(track => track.stop());
-            document.body.removeChild(overlay);
-            
-            canvas.toBlob(async (blob) => {
-                if (blob) {
-                    await uploadPhoto(blob);
-                }
-            }, 'image/jpeg', 0.9);
-        };
-        
-        document.getElementById('cancelCapture').onclick = () => {
-            stream.getTracks().forEach(track => track.stop());
-            document.body.removeChild(overlay);
-        };
-        
-    } catch (error) {
-        console.error('Camera error:', error);
-        alert('âŒ Camera access denied or unavailable.\n\nTry uploading a photo instead.');
-    }
-}
+// capturePhoto removed - using native file input with capture="environment" attribute
 
 async function handlePhotoFile(event) {
     const file = event.target.files[0];
     if (!file) return;
-    
     if (!file.type.startsWith('image/')) {
-        alert('âŒ Please select an image file.');
+        alert('Please select an image file.');
         return;
     }
-    
-    await uploadPhoto(file);
+    await savePhotoLocally(file);
     event.target.value = '';
 }
 
-// Photo Upload
-async function uploadPhoto(photoBlob) {
-    if (!authToken) {
-        alert('âŒ Authentication required for photo upload.');
-        return;
-    }
-    
-    showLoadingIndicator('Uploading photo...');
-    
+// Photo Save - Local IndexedDB (no server needed)
+async function savePhotoLocally(photoBlob) {
+    showLoadingIndicator('Saving photo...');
     try {
-        const formData = new FormData();
-        formData.append('photo', photoBlob, `${selectedLocation.name}-${Date.now()}.jpg`);
-        
-        const response = await fetch(`${CONFIG.apiUrl}/api/upload`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            },
-            body: formData
+        const reader = new FileReader();
+        const dataUrl = await new Promise((resolve, reject) => {
+            reader.onload = e => resolve(e.target.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(photoBlob);
         });
-        
-        if (!response.ok) {
-            throw new Error(`Upload failed: ${response.status}`);
-        }
-        
-        const result = await response.json();
         
         const photoData = {
             id: Date.now().toString(),
-            storage: result.storage,
-            assetId: result.assetId || result.cloudinaryId,
-            url: getProxiedImageUrl(result),
-            fullUrl: result.fullUrl || result.url,
-            timestamp: result.timestamp || new Date().toISOString(),
+            url: dataUrl,
+            timestamp: Date.now(),
             location: selectedLocation.name,
-            needsSync: result.needsSync || false
+            storage: 'local'
         };
         
-        addPhotoToLocation(selectedLocation.name, photoData);
-        currentLocationPhotos = getLocationPhotos(selectedLocation.name);
+        await savePhotoToDB(photoData);
+        currentLocationPhotos = await loadLocationPhotos(selectedLocation.name);
         
         hideLoadingIndicator();
-        
-        if (photoViewMode) {
-            showPhotoGallery();
-        }
-        
-        alert(`âœ… Photo uploaded to ${result.storage}!`);
-        
+        if (photoViewMode) showPhotoGallery();
     } catch (error) {
-        console.error('Upload failed:', error);
+        console.error('Photo save failed:', error);
         hideLoadingIndicator();
-        alert('âŒ Photo upload failed.\n\n' + error.message);
+        alert('Photo save failed: ' + error.message);
     }
 }
 
-function getProxiedImageUrl(result) {
-    if (result.storage === 'immich' && result.assetId) {
-        return `${CONFIG.apiUrl}/api/immich/assets/${result.assetId}/thumbnail`;
-    } else {
-        return result.url;
-    }
-}
+
 
 function showLoadingIndicator(message) {
     const existing = document.getElementById('loadingIndicator');
@@ -586,23 +513,22 @@ function viewFullPhoto(index) {
     viewer.innerHTML = `
         <div class="photo-viewer">
             <div class="photo-viewer-header">
-                <button onclick="closePhotoViewer()">âœ• Close</button>
+                <button onclick="closePhotoViewer()">✕ Close</button>
                 <div class="photo-info">${index + 1} / ${currentLocationPhotos.length}</div>
             </div>
-            <img src="${photo.fullUrl || photo.url}" alt="Photo">
+            <img src="${photo.url}" alt="Photo">
             <div class="photo-viewer-footer">
                 <div>${selectedLocation.name}</div>
                 <div>${new Date(photo.timestamp).toLocaleString()}</div>
-                <div>${photo.storage === 'immich' ? 'ðŸ  Immich' : photo.storage === 'cloudinary' ? 'â˜️ Cloudinary' : 'ðŸ“± Local'}</div>
+                <div>📱 Local</div>
             </div>
             <div class="photo-viewer-nav">
-                ${index > 0 ? `<button onclick="viewFullPhoto(${index - 1})">â† Previous</button>` : '<div></div>'}
-                <button class="btn-delete" onclick="deletePhoto(${index})">ðŸ—‘️ Delete</button>
-                ${index < currentLocationPhotos.length - 1 ? `<button onclick="viewFullPhoto(${index + 1})">Next â†’</button>` : '<div></div>'}
+                ${index > 0 ? `<button onclick="viewFullPhoto(${index - 1})">← Previous</button>` : '<div></div>'}
+                <button class="btn-delete" onclick="deletePhoto(${index})">🗑️ Delete</button>
+                ${index < currentLocationPhotos.length - 1 ? `<button onclick="viewFullPhoto(${index + 1})">Next →</button>` : '<div></div>'}
             </div>
         </div>
     `;
-    
     document.body.appendChild(viewer);
 }
 
@@ -613,20 +539,15 @@ function closePhotoViewer() {
     }
 }
 
-function deletePhoto(index) {
+async function deletePhoto(index) {
     if (!confirm('Delete this photo?')) return;
     
-    currentLocationPhotos.splice(index, 1);
-    locationPhotos[selectedLocation.name] = currentLocationPhotos;
-    savePhotos();
+    const photo = currentLocationPhotos[index];
+    if (photo) await deletePhotoFromDB(photo.id);
     
+    currentLocationPhotos = await loadLocationPhotos(selectedLocation.name);
     closePhotoViewer();
-    
-    if (photoViewMode) {
-        showPhotoGallery();
-    }
-    
-    alert('âœ“ Photo deleted');
+    if (photoViewMode) showPhotoGallery();
 }
 
 // Email & Code Modal
@@ -1247,28 +1168,28 @@ function updateCurrentDate() {
 }
 
 // Export/Import - WITH PHOTOS
-function exportData() {
+async function exportData() {
+    const allPhotos = await getAllPhotosForExport();
     const data = {
         entries: entries,
-        photos: locationPhotos,
+        photos: allPhotos,
+        addressOverrides: addressOverrides,
         exportDate: new Date().toISOString(),
-        version: 'v4.3.0'
+        version: 'v4.4.0'
     };
     
     const dataStr = JSON.stringify(data, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    
     const date = new Date().toISOString().split('T')[0];
-    const filename = `field-assistant-backup-${date}.json`;
+    const filename = `time-tracker-backup-${date}.json`;
     
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
     a.click();
-    
     URL.revokeObjectURL(url);
-    alert(`âœ“ Backup saved: ${filename}\n\nIncludes time entries and photo metadata.`);
+    alert(`✅ Backup saved: ${filename}\n\nIncludes ${entries.length} entries and ${allPhotos.length} photos.`);
 }
 
 function importData() {
@@ -1276,42 +1197,48 @@ function importData() {
     input.type = 'file';
     input.accept = '.json';
     
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
         
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = async (event) => {
             try {
                 const data = JSON.parse(event.target.result);
-                
                 if (!data.entries || !Array.isArray(data.entries)) {
-                    alert('âŒ Invalid backup file');
+                    alert('✘ Invalid backup file');
                     return;
                 }
                 
-                const confirmMsg = `Import ${data.entries.length} entries?\n\nThis will REPLACE your current data.\n\nBackup exported: ${new Date(data.exportDate).toLocaleString()}`;
+                const photoCount = (data.photos || []).length;
+                const confirmMsg = `Import ${data.entries.length} entries and ${photoCount} photos?\n\nThis will REPLACE your current data.\n\nBackup exported: ${new Date(data.exportDate).toLocaleString()}`;
                 
                 if (confirm(confirmMsg)) {
                     entries = data.entries;
                     saveEntries();
                     
-                    if (data.photos) {
-                        locationPhotos = data.photos;
-                        savePhotos();
+                    if (data.addressOverrides) {
+                        addressOverrides = data.addressOverrides;
+                        saveAddressOverrides();
+                    }
+                    
+                    if (data.photos && data.photos.length > 0 && photoDB) {
+                        const tx = photoDB.transaction('photos', 'readwrite');
+                        const store = tx.objectStore('photos');
+                        store.clear();
+                        data.photos.forEach(p => store.put(p));
+                        await new Promise(r => tx.oncomplete = r);
                     }
                     
                     renderEntries();
-                    alert(`âœ“ Imported ${entries.length} entries successfully!`);
+                    alert(`✅ Imported ${entries.length} entries and ${photoCount} photos successfully!`);
                 }
             } catch (err) {
-                alert('âŒ Error reading backup file: ' + err.message);
+                alert('✘ Error reading backup file: ' + err.message);
             }
         };
-        
         reader.readAsText(file);
     };
-    
     input.click();
 }
 
@@ -1336,43 +1263,6 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Authentication
-async function checkAuthentication() {
-    if (!authToken) return false;
-    if (authExpiry && new Date(authExpiry) < new Date()) return false;
-    try {
-        const res = await fetch(`${CONFIG.apiUrl}/auth/validate`, {
-            method: 'POST', 
-            headers: {'Authorization': `Bearer ${authToken}`}
-        });
-        return res.ok;
-    } catch { 
-        return false; 
-    }
-}
-
-async function showLoginPrompt() {
-    const pass = prompt('ðŸ”’ Password (Cancel=timer-only):');
-    if (!pass) return false;
-    try {
-        const res = await fetch(`${CONFIG.apiUrl}/auth/login`, {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({password:pass})
-        });
-        if (!res.ok) return false;
-        const data = await res.json();
-        authToken = data.token;
-        const exp = new Date(); 
-        exp.setDate(exp.getDate() + 30);
-        authExpiry = exp.toISOString();
-        localStorage.setItem('authToken', authToken);
-        localStorage.setItem('authExpiry', authExpiry);
-        return true;
-    } catch { 
-        return false; 
-    }
-}
 
 // ============================================
 // GPS LOCATION LOG
