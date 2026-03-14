@@ -1507,3 +1507,23 @@ header h1 {
 .close-ticket-content button:active {
     background: rgba(255,255,255,0.4);
 }
+
+/* Pinch zoom container */
+.photo-zoom-container {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.photo-zoom-container img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: grab;
+    will-change: transform;
+}

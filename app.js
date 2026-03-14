@@ -23,6 +23,22 @@ let currentCalendarDate = new Date();
 let addressOverrides = {};
 let lastViewedDate = null;
 
+function persistPhotoState() {
+    if (selectedLocation) sessionStorage.setItem('photoLocation', JSON.stringify(selectedLocation));
+    sessionStorage.setItem('photoViewMode', photoViewMode ? '1' : '0');
+    if (selectedCategory) sessionStorage.setItem('photoCategory', selectedCategory);
+}
+
+function restorePhotoState() {
+    const loc = sessionStorage.getItem('photoLocation');
+    const mode = sessionStorage.getItem('photoViewMode');
+    const cat = sessionStorage.getItem('photoCategory');
+    if (loc) { selectedLocation = JSON.parse(loc); sessionStorage.removeItem('photoLocation'); }
+    if (mode !== null) { photoViewMode = mode === '1'; sessionStorage.removeItem('photoViewMode'); }
+    if (cat) { selectedCategory = cat; sessionStorage.removeItem('photoCategory'); }
+    return !!loc;
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     await initPhotoDB();
@@ -31,19 +47,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert('ERROR: Location data failed to load. Please refresh.');
         return;
     }
-    console.log('âœ“ CATEGORIES loaded:', Object.keys(CATEGORIES).length, 'categories');
-    
+
+    // Wire persistent file inputs (survive iOS camera reload)
+    document.getElementById('photoCameraInput').addEventListener('change', handlePhotoFile);
+    document.getElementById('photoFileInput').addEventListener('change', handlePhotoFile);
+
     setTimeout(() => {
         const clearBtn = document.getElementById('clearSearchBtn');
         if (clearBtn) clearBtn.classList.add('hidden');
-        
         const searchResults = document.getElementById('globalSearchResults');
-        if (searchResults) {
-            searchResults.classList.add('hidden');
-            searchResults.innerHTML = '';
-        }
+        if (searchResults) { searchResults.classList.add('hidden'); searchResults.innerHTML = ''; }
     }, 100);
-    
+
     loadEntries();
     loadAddressOverrides();
     loadLocationLog();
@@ -52,6 +67,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateCurrentDate();
     setupEventListeners();
     checkActiveEntry();
+
+    // Restore after iOS camera reload
+    const wasInPhotoMode = restorePhotoState();
+    if (wasInPhotoMode && selectedLocation) {
+        currentLocationPhotos = await loadLocationPhotos(selectedLocation.name);
+        document.getElementById('globalSearchSection').classList.add('hidden');
+        document.getElementById('categorySelection').classList.add('hidden');
+        document.getElementById('locationDetails').classList.remove('hidden');
+        if (photoViewMode) { showPhotoGallery(); } else { renderLocationDetailsView(); }
+    }
 });
 
 // Storage
@@ -389,10 +414,8 @@ function showPhotoGallery() {
             <p>${currentLocationPhotos.length} photo${currentLocationPhotos.length !== 1 ? 's' : ''}</p>
         </div>
         <div class="photo-capture-section">
-            <input type="file" id="photoCameraInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoFile(event)">
-            <input type="file" id="photoFileInput" accept="image/*" style="display:none;" onchange="handlePhotoFile(event)">
-            <button class="btn btn-primary btn-capture" onclick="document.getElementById('photoCameraInput').click()">📷 Take Photo</button>
-            <button class="btn btn-secondary" onclick="document.getElementById('photoFileInput').click()">📁 Upload Photo</button>
+            <button class="btn btn-primary btn-capture" onclick="persistPhotoState();document.getElementById('photoCameraInput').click()">📷 Take Photo</button>
+            <button class="btn btn-secondary" onclick="persistPhotoState();document.getElementById('photoFileInput').click()">📁 Upload Photo</button>
         </div>
         <div class="photo-gallery" id="photoGalleryGrid">
             ${renderPhotoGrid()}
@@ -457,6 +480,7 @@ async function savePhotoLocally(photoBlob) {
             reader.readAsDataURL(photoBlob);
         });
         
+        if (!selectedLocation) throw new Error('Location lost - please go back and try again');
         const photoData = {
             id: Date.now().toString(),
             url: dataUrl,
@@ -506,7 +530,7 @@ function hideLoadingIndicator() {
 function viewFullPhoto(index) {
     const photo = currentLocationPhotos[index];
     if (!photo) return;
-    
+
     const viewer = document.createElement('div');
     viewer.className = 'photo-viewer-overlay';
     viewer.innerHTML = `
@@ -515,11 +539,12 @@ function viewFullPhoto(index) {
                 <button onclick="closePhotoViewer()">✕ Close</button>
                 <div class="photo-info">${index + 1} / ${currentLocationPhotos.length}</div>
             </div>
-            <img src="${photo.url}" alt="Photo">
+            <div class="photo-zoom-container" id="photoZoomContainer">
+                <img id="photoViewerImg" src="${photo.url}" alt="Photo" style="touch-action:none;transform-origin:center center;">
+            </div>
             <div class="photo-viewer-footer">
                 <div>${selectedLocation.name}</div>
                 <div>${new Date(photo.timestamp).toLocaleString()}</div>
-                <div>📱 Local</div>
             </div>
             <div class="photo-viewer-nav">
                 ${index > 0 ? `<button onclick="viewFullPhoto(${index - 1})">← Previous</button>` : '<div></div>'}
@@ -529,6 +554,68 @@ function viewFullPhoto(index) {
         </div>
     `;
     document.body.appendChild(viewer);
+    initPinchZoom(document.getElementById('photoViewerImg'));
+}
+
+function initPinchZoom(img) {
+    let scale = 1, lastScale = 1;
+    let originX = 0, originY = 0;
+    let lastX = 0, lastY = 0;
+    let isPinching = false;
+
+    img.addEventListener('touchstart', e => {
+        if (e.touches.length === 2) {
+            isPinching = true;
+            lastScale = scale;
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            originX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            originY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            img._pinchDist = Math.hypot(dx, dy);
+        } else if (e.touches.length === 1 && scale > 1) {
+            lastX = e.touches[0].clientX - (img._translateX || 0);
+            lastY = e.touches[0].clientY - (img._translateY || 0);
+        }
+    }, { passive: true });
+
+    img.addEventListener('touchmove', e => {
+        if (e.touches.length === 2 && isPinching) {
+            e.preventDefault();
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const dist = Math.hypot(dx, dy);
+            scale = Math.min(Math.max(lastScale * (dist / img._pinchDist), 1), 5);
+            applyTransform(img, scale);
+        } else if (e.touches.length === 1 && scale > 1) {
+            e.preventDefault();
+            img._translateX = e.touches[0].clientX - lastX;
+            img._translateY = e.touches[0].clientY - lastY;
+            applyTransform(img);
+        }
+    }, { passive: false });
+
+    img.addEventListener('touchend', e => {
+        if (e.touches.length < 2) isPinching = false;
+        if (scale <= 1) { scale = 1; img._translateX = 0; img._translateY = 0; applyTransform(img, 1); }
+    }, { passive: true });
+
+    // Double-tap to reset
+    let lastTap = 0;
+    img.addEventListener('touchend', e => {
+        const now = Date.now();
+        if (now - lastTap < 300) {
+            scale = 1; img._translateX = 0; img._translateY = 0; applyTransform(img, 1);
+        }
+        lastTap = now;
+    }, { passive: true });
+}
+
+function applyTransform(img, s) {
+    if (s !== undefined) img._currentScale = s;
+    const sc = img._currentScale || 1;
+    const tx = img._translateX || 0;
+    const ty = img._translateY || 0;
+    img.style.transform = `translate(${tx}px, ${ty}px) scale(${sc})`;
 }
 
 function closePhotoViewer() {
@@ -1160,35 +1247,21 @@ async function exportData() {
         photos: allPhotos,
         addressOverrides: addressOverrides,
         exportDate: new Date().toISOString(),
-        version: 'v4.5.2'
+        version: 'v4.5.0'
     };
     
     const dataStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
     const date = new Date().toISOString().split('T')[0];
     const filename = `time-tracker-backup-${date}.json`;
-    const file = new File([dataStr], filename, { type: 'application/json' });
-
-    // Use Web Share API on iOS (triggers "Save to Files")
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-            await navigator.share({
-                files: [file],
-                title: 'Time Tracker Backup'
-            });
-            return;
-        } catch (err) {
-            if (err.name === 'AbortError') return; // user cancelled
-        }
-    }
-
-    // Fallback for non-iOS / desktop
-    const url = URL.createObjectURL(file);
+    
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    alert(`✅ Backup saved: ${filename}\n\n${entries.length} entries, ${allPhotos.length} photos.`);
+    alert(`✅ Backup saved: ${filename}\n\nIncludes ${entries.length} entries and ${allPhotos.length} photos.`);
 }
 
 function importData() {
