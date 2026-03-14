@@ -136,12 +136,21 @@ async function getAllPhotosForExport() {
 }
 
 async function getPhotoCountForLocation(locationName) {
-    if (!photoDB) return 0;
+    const counts = await getAllPhotoCountsMap();
+    return counts[locationName] || 0;
+}
+
+async function getAllPhotoCountsMap() {
+    if (!photoDB) return {};
     return new Promise(resolve => {
         const tx = photoDB.transaction('photos', 'readonly');
         const req = tx.objectStore('photos').getAll();
-        req.onsuccess = () => resolve((req.result || []).filter(p => p.location === locationName).length);
-        req.onerror = () => resolve(0);
+        req.onsuccess = () => {
+            const map = {};
+            (req.result || []).forEach(p => { map[p.location] = (map[p.location] || 0) + 1; });
+            resolve(map);
+        };
+        req.onerror = () => resolve({});
     });
 }
 
@@ -281,15 +290,16 @@ async function renderLocationList() {
         return;
     }
     
-    const items = await Promise.all(locations.map(async loc => {
-        const photoCount = await getPhotoCountForLocation(loc.name);
+    const photoCounts = await getAllPhotoCountsMap();
+    const items = locations.map(loc => {
+        const photoCount = photoCounts[loc.name] || 0;
         const photoIndicator = photoCount > 0 ? ` 📸 ${photoCount}` : '';
         return `<div class="location-item" onclick="showLocationDetails('${escapeHtml(loc.name)}', '${escapeHtml(loc.chargeCodeSZ)}', '${escapeHtml(loc.chargeCodeMOS)}', '${escapeHtml(loc.address || '')}', '${escapeHtml(selectedCategory)}')">
             <div class="loc-name">${loc.name}${photoIndicator}</div>
             <div class="loc-code">${loc.chargeCodeSZ || 'No code'}</div>
             ${loc.address && loc.address.trim() !== '' ? `<div class="loc-address">${loc.address}</div>` : ''}
         </div>`;
-    }));
+    });
     list.innerHTML = items.join('');
 }
 
