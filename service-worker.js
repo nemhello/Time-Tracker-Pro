@@ -1,4 +1,4 @@
-const CACHE_NAME = 'time-tracker-pro-v4.6.2';
+const CACHE_NAME = 'time-tracker-pro-v4.6.3';
 const urlsToCache = [
   '/Time-Tracker-Pro/',
   '/Time-Tracker-Pro/index.html',
@@ -12,7 +12,7 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(urlsToCache))
-      .then(() => self.skipWaiting())  // activate immediately, don't wait
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -22,17 +22,24 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);  // purge old caches
+            return caches.delete(cacheName);
           }
         })
       );
-    }).then(() => self.clients.claim())  // take control of open tabs immediately
+    }).then(() => self.clients.claim())
   );
 });
 
+// Network-first: try network, fall back to cache (for offline use)
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
+    fetch(event.request)
+      .then(response => {
+        // Cache the fresh response for offline use
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
