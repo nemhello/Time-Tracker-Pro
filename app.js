@@ -4,7 +4,8 @@ let photoCountsCache = null;
 
 // IndexedDB init
 function initPhotoDB() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
+        let resolved = false;
         const req = indexedDB.open('TimeTrackerPhotos', 2);
         req.onupgradeneeded = e => {
             const db = e.target.result;
@@ -12,14 +13,20 @@ function initPhotoDB() {
             if (!db.objectStoreNames.contains('photos')) {
                 store = db.createObjectStore('photos', { keyPath: 'id' });
             } else {
-                store = e.target.transaction.objectStore('photos');
+                store = req.transaction.objectStore('photos');
             }
             if (!store.indexNames.contains('by_location')) {
                 store.createIndex('by_location', 'location', { unique: false });
             }
         };
-        req.onsuccess = e => { photoDB = e.target.result; resolve(); };
-        req.onerror = () => reject(req.error);
+        req.onblocked = () => {
+            console.warn('IndexedDB upgrade blocked - continuing without DB');
+            if (!resolved) { resolved = true; resolve(); }
+        };
+        req.onsuccess = e => { photoDB = e.target.result; if (!resolved) { resolved = true; resolve(); } };
+        req.onerror = () => { console.error('IndexedDB error:', req.error); if (!resolved) { resolved = true; resolve(); } };
+        // Timeout fallback - don't let DB issues block the app
+        setTimeout(() => { if (!resolved) { resolved = true; console.warn('IndexedDB timed out'); resolve(); } }, 3000);
     });
 }
 
@@ -111,9 +118,15 @@ async function loadLocationPhotos(locationName) {
     if (!photoDB) return [];
     return new Promise(resolve => {
         const tx = photoDB.transaction('photos', 'readonly');
-        const index = tx.objectStore('photos').index('by_location');
-        const req = index.getAll(IDBKeyRange.only(locationName));
-        req.onsuccess = () => resolve((req.result || []).sort((a,b) => b.timestamp - a.timestamp));
+        const store = tx.objectStore('photos');
+        let req;
+        if (store.indexNames.contains('by_location')) {
+            req = store.index('by_location').getAll(IDBKeyRange.only(locationName));
+            req.onsuccess = () => resolve((req.result || []).sort((a,b) => b.timestamp - a.timestamp));
+        } else {
+            req = store.getAll();
+            req.onsuccess = () => resolve((req.result || []).filter(p => p.location === locationName).sort((a,b) => b.timestamp - a.timestamp));
+        }
         req.onerror = () => resolve([]);
     });
 }
@@ -158,20 +171,30 @@ async function getAllPhotoCountsMap() {
     if (!photoDB) return {};
     return new Promise(resolve => {
         const tx = photoDB.transaction('photos', 'readonly');
-        const index = tx.objectStore('photos').index('by_location');
+        const store = tx.objectStore('photos');
         const map = {};
-        const req = index.openKeyCursor();
-        req.onsuccess = e => {
-            const cursor = e.target.result;
-            if (cursor) {
-                map[cursor.key] = (map[cursor.key] || 0) + 1;
-                cursor.continue();
-            } else {
+        if (store.indexNames.contains('by_location')) {
+            const req = store.index('by_location').openKeyCursor();
+            req.onsuccess = e => {
+                const cursor = e.target.result;
+                if (cursor) {
+                    map[cursor.key] = (map[cursor.key] || 0) + 1;
+                    cursor.continue();
+                } else {
+                    photoCountsCache = map;
+                    resolve(map);
+                }
+            };
+            req.onerror = () => resolve({});
+        } else {
+            const req = store.getAll();
+            req.onsuccess = () => {
+                (req.result || []).forEach(p => { map[p.location] = (map[p.location] || 0) + 1; });
                 photoCountsCache = map;
                 resolve(map);
-            }
-        };
-        req.onerror = () => resolve({});
+            };
+            req.onerror = () => resolve({});
+        }
     });
 }
 
