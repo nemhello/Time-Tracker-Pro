@@ -1,12 +1,22 @@
 let photoDB = null;
 let currentLocationPhotos = [], photoViewMode = false;
+let photoCountsCache = null;
 
 // IndexedDB init
 function initPhotoDB() {
     return new Promise((resolve, reject) => {
-        const req = indexedDB.open('TimeTrackerPhotos', 1);
+        const req = indexedDB.open('TimeTrackerPhotos', 2);
         req.onupgradeneeded = e => {
-            e.target.result.createObjectStore('photos', { keyPath: 'id' });
+            const db = e.target.result;
+            let store;
+            if (!db.objectStoreNames.contains('photos')) {
+                store = db.createObjectStore('photos', { keyPath: 'id' });
+            } else {
+                store = e.target.transaction.objectStore('photos');
+            }
+            if (!store.indexNames.contains('by_location')) {
+                store.createIndex('by_location', 'location', { unique: false });
+            }
         };
         req.onsuccess = e => { photoDB = e.target.result; resolve(); };
         req.onerror = () => reject(req.error);
@@ -22,6 +32,7 @@ let selectedLocation = null;
 let currentCalendarDate = new Date();
 let addressOverrides = {};
 let lastViewedDate = null;
+let searchDebounceTimer = null;
 
 function persistPhotoState() {
     if (selectedLocation) sessionStorage.setItem('photoLocation', JSON.stringify(selectedLocation));
@@ -100,15 +111,16 @@ async function loadLocationPhotos(locationName) {
     if (!photoDB) return [];
     return new Promise(resolve => {
         const tx = photoDB.transaction('photos', 'readonly');
-        const store = tx.objectStore('photos');
-        const req = store.getAll();
-        req.onsuccess = () => resolve((req.result || []).filter(p => p.location === locationName).sort((a,b) => b.timestamp - a.timestamp));
+        const index = tx.objectStore('photos').index('by_location');
+        const req = index.getAll(IDBKeyRange.only(locationName));
+        req.onsuccess = () => resolve((req.result || []).sort((a,b) => b.timestamp - a.timestamp));
         req.onerror = () => resolve([]);
     });
 }
 
 async function savePhotoToDB(photoData) {
     if (!photoDB) return;
+    photoCountsCache = null;
     return new Promise(resolve => {
         const tx = photoDB.transaction('photos', 'readwrite');
         tx.objectStore('photos').put(photoData);
@@ -118,6 +130,7 @@ async function savePhotoToDB(photoData) {
 
 async function deletePhotoFromDB(photoId) {
     if (!photoDB) return;
+    photoCountsCache = null;
     return new Promise(resolve => {
         const tx = photoDB.transaction('photos', 'readwrite');
         tx.objectStore('photos').delete(photoId);
@@ -141,14 +154,22 @@ async function getPhotoCountForLocation(locationName) {
 }
 
 async function getAllPhotoCountsMap() {
+    if (photoCountsCache) return photoCountsCache;
     if (!photoDB) return {};
     return new Promise(resolve => {
         const tx = photoDB.transaction('photos', 'readonly');
-        const req = tx.objectStore('photos').getAll();
-        req.onsuccess = () => {
-            const map = {};
-            (req.result || []).forEach(p => { map[p.location] = (map[p.location] || 0) + 1; });
-            resolve(map);
+        const index = tx.objectStore('photos').index('by_location');
+        const map = {};
+        const req = index.openKeyCursor();
+        req.onsuccess = e => {
+            const cursor = e.target.result;
+            if (cursor) {
+                map[cursor.key] = (map[cursor.key] || 0) + 1;
+                cursor.continue();
+            } else {
+                photoCountsCache = map;
+                resolve(map);
+            }
         };
         req.onerror = () => resolve({});
     });
@@ -338,10 +359,11 @@ async function showLocationDetails(name, chargeCodeSZ, chargeCodeMOS, address, c
     document.getElementById('locationDetails').classList.remove('hidden');
     renderLocationDetailsView();
 
-    // Load photos in background, update when ready
+    // Load photos in background, update only if count changed
     loadLocationPhotos(name).then(photos => {
+        const hadPhotos = currentLocationPhotos.length;
         currentLocationPhotos = photos;
-        if (!photoViewMode) renderLocationDetailsView();
+        if (!photoViewMode && photos.length !== hadPhotos) renderLocationDetailsView();
     });
 }
 
@@ -1223,7 +1245,8 @@ function deleteSearchEntry(id) {
 // Event Listeners
 function setupEventListeners() {
     document.getElementById('globalSearchBox').addEventListener('input', (e) => {
-        handleGlobalSearch(e.target.value);
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => handleGlobalSearch(e.target.value), 150);
     });
     
     document.getElementById('clearSearchBtn').addEventListener('click', clearSearch);
