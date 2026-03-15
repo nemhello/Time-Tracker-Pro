@@ -228,12 +228,22 @@ function handleGlobalSearch(searchTerm) {
     }
     
     results.innerHTML = allMatches.map(loc => `
-        <div class="location-item" onclick="showLocationDetails('${escapeHtml(loc.name)}', '${escapeHtml(loc.chargeCodeSZ)}', '${escapeHtml(loc.chargeCodeMOS)}', '${escapeHtml(loc.address)}', '${escapeHtml(loc.category)}')">
-            <div class="loc-name">${loc.name}</div>
-            <div class="loc-code">${loc.chargeCodeSZ || 'No code'}</div>
-            <div class="loc-category">${loc.category}</div>
+        <div class="location-item"
+            data-name="${escapeAttr(loc.name)}"
+            data-sz="${escapeAttr(loc.chargeCodeSZ)}"
+            data-mos="${escapeAttr(loc.chargeCodeMOS)}"
+            data-addr="${escapeAttr(loc.address)}"
+            data-cat="${escapeAttr(loc.category)}">
+            <div class="loc-name">${escapeHtml(loc.name)}</div>
+            <div class="loc-code">${escapeHtml(loc.chargeCodeSZ) || 'No code'}</div>
+            <div class="loc-category">${escapeHtml(loc.category)}</div>
         </div>
     `).join('');
+    results.querySelectorAll('.location-item').forEach(el => {
+        el.addEventListener('click', () => showLocationDetails(
+            el.dataset.name, el.dataset.sz, el.dataset.mos, el.dataset.addr, el.dataset.cat
+        ));
+    });
 }
 
 function clearSearch() {
@@ -294,13 +304,23 @@ async function renderLocationList() {
     const items = locations.map(loc => {
         const photoCount = photoCounts[loc.name] || 0;
         const photoIndicator = photoCount > 0 ? ` 📸 ${photoCount}` : '';
-        return `<div class="location-item" onclick="showLocationDetails('${escapeHtml(loc.name)}', '${escapeHtml(loc.chargeCodeSZ)}', '${escapeHtml(loc.chargeCodeMOS)}', '${escapeHtml(loc.address || '')}', '${escapeHtml(selectedCategory)}')">
-            <div class="loc-name">${loc.name}${photoIndicator}</div>
-            <div class="loc-code">${loc.chargeCodeSZ || 'No code'}</div>
-            ${loc.address && loc.address.trim() !== '' ? `<div class="loc-address">${loc.address}</div>` : ''}
+        return `<div class="location-item"
+            data-name="${escapeAttr(loc.name)}"
+            data-sz="${escapeAttr(loc.chargeCodeSZ)}"
+            data-mos="${escapeAttr(loc.chargeCodeMOS)}"
+            data-addr="${escapeAttr(loc.address || '')}"
+            data-cat="${escapeAttr(selectedCategory)}">
+            <div class="loc-name">${escapeHtml(loc.name)}${photoIndicator}</div>
+            <div class="loc-code">${escapeHtml(loc.chargeCodeSZ) || 'No code'}</div>
+            ${loc.address && loc.address.trim() !== '' ? `<div class="loc-address">${escapeHtml(loc.address)}</div>` : ''}
         </div>`;
     });
     list.innerHTML = items.join('');
+    list.querySelectorAll('.location-item').forEach(el => {
+        el.addEventListener('click', () => showLocationDetails(
+            el.dataset.name, el.dataset.sz, el.dataset.mos, el.dataset.addr, el.dataset.cat
+        ));
+    });
 }
 
 // Location Details - WITH PHOTO BUTTON
@@ -1341,8 +1361,12 @@ function formatDuration(ms) {
 
 function escapeHtml(text) {
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = text || '';
     return div.innerHTML;
+}
+
+function escapeAttr(text) {
+    return (text || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 
