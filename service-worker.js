@@ -1,4 +1,4 @@
-const CACHE_NAME = 'time-tracker-pro-v4.6.0';
+const CACHE_NAME = 'time-tracker-pro-v4.6.1';
 const urlsToCache = [
   '/Time-Tracker-Pro/',
   '/Time-Tracker-Pro/index.html',

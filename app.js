@@ -1622,8 +1622,13 @@ function hideBackupView() {
 }
 
 function startBackupSchedule() {
-    // Check on app open
-    autoBackup();
+    // Delay backup 30 seconds so it doesn't block page load
+    setTimeout(() => {
+        const lastBackup = localStorage.getItem('lastAutoBackup');
+        if (lastBackup !== getTodayDateString()) {
+            autoBackup();
+        }
+    }, 30000);
 
     // Check every 30 minutes (catches day rollover if app stays open)
     backupCheckInterval = setInterval(() => {
