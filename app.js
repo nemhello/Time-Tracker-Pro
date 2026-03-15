@@ -6,7 +6,7 @@ let photoCountsCache = null;
 function initPhotoDB() {
     return new Promise((resolve) => {
         let resolved = false;
-        const req = indexedDB.open('TimeTrackerPhotos', 2);
+        const req = indexedDB.open('TimeTrackerPhotos', 3);
         req.onupgradeneeded = e => {
             const db = e.target.result;
             let store;
@@ -17,6 +17,9 @@ function initPhotoDB() {
             }
             if (!store.indexNames.contains('by_location')) {
                 store.createIndex('by_location', 'location', { unique: false });
+            }
+            if (!db.objectStoreNames.contains('backups')) {
+                db.createObjectStore('backups', { keyPath: 'date' });
             }
         };
         req.onblocked = () => {
@@ -85,6 +88,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateCurrentDate();
     setupEventListeners();
     checkActiveEntry();
+    startBackupSchedule();
 
     // Restore after iOS camera reload
     const wasInPhotoMode = restorePhotoState();
@@ -1292,6 +1296,9 @@ function setupEventListeners() {
     document.getElementById('backFromLogBtn').addEventListener('click', hideLocationLog);
     document.getElementById('smsLogBtn').addEventListener('click', smsLocationLog);
     document.getElementById('clearLogBtn').addEventListener('click', clearLocationLog);
+
+    document.getElementById('viewBackupsBtn').addEventListener('click', showBackupView);
+    document.getElementById('backFromBackupsBtn').addEventListener('click', hideBackupView);
     
     const workOrderField = document.getElementById('workOrderField');
     if (workOrderField) {
@@ -1421,6 +1428,211 @@ function escapeAttr(text) {
     return (text || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+
+// ============================================
+// AUTO-BACKUP (end of day, local only)
+// ============================================
+
+const MAX_BACKUPS = 7;
+let backupCheckInterval = null;
+
+function getTodayDateString() {
+    return new Date().toISOString().split('T')[0];
+}
+
+async function autoBackup() {
+    if (!photoDB || !photoDB.objectStoreNames.contains('backups')) return;
+
+    const today = getTodayDateString();
+    const lastBackup = localStorage.getItem('lastAutoBackup');
+    if (lastBackup === today) return; // already backed up today
+
+    try {
+        const allPhotos = await getAllPhotosForExport();
+        const backup = {
+            date: today,
+            timestamp: new Date().toISOString(),
+            entries: entries,
+            photos: allPhotos,
+            addressOverrides: addressOverrides,
+            locationLog: locationLog || [],
+            version: document.querySelector('.version')?.textContent || 'unknown'
+        };
+
+        await new Promise((resolve, reject) => {
+            const tx = photoDB.transaction('backups', 'readwrite');
+            tx.objectStore('backups').put(backup);
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error);
+        });
+
+        localStorage.setItem('lastAutoBackup', today);
+        console.log('Auto-backup saved for', today);
+        showBackupStatus('✓ Auto-backup saved');
+
+        await pruneOldBackups();
+    } catch (err) {
+        console.error('Auto-backup failed:', err);
+    }
+}
+
+async function pruneOldBackups() {
+    if (!photoDB || !photoDB.objectStoreNames.contains('backups')) return;
+    return new Promise(resolve => {
+        const tx = photoDB.transaction('backups', 'readwrite');
+        const store = tx.objectStore('backups');
+        const req = store.getAllKeys();
+        req.onsuccess = () => {
+            const keys = (req.result || []).sort();
+            if (keys.length > MAX_BACKUPS) {
+                const toDelete = keys.slice(0, keys.length - MAX_BACKUPS);
+                toDelete.forEach(k => store.delete(k));
+            }
+        };
+        tx.oncomplete = resolve;
+        tx.onerror = resolve;
+    });
+}
+
+async function listBackups() {
+    if (!photoDB || !photoDB.objectStoreNames.contains('backups')) return [];
+    return new Promise(resolve => {
+        const tx = photoDB.transaction('backups', 'readonly');
+        const req = tx.objectStore('backups').getAll();
+        req.onsuccess = () => {
+            const backups = (req.result || []).map(b => ({
+                date: b.date,
+                timestamp: b.timestamp,
+                entryCount: (b.entries || []).length,
+                photoCount: (b.photos || []).length,
+                version: b.version
+            }));
+            backups.sort((a, b) => b.date.localeCompare(a.date));
+            resolve(backups);
+        };
+        req.onerror = () => resolve([]);
+    });
+}
+
+async function loadBackup(date) {
+    if (!photoDB || !photoDB.objectStoreNames.contains('backups')) return null;
+    return new Promise(resolve => {
+        const tx = photoDB.transaction('backups', 'readonly');
+        const req = tx.objectStore('backups').get(date);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+    });
+}
+
+async function restoreFromBackup(date) {
+    const backup = await loadBackup(date);
+    if (!backup) { alert('Backup not found.'); return; }
+
+    const msg = `Restore backup from ${backup.date}?\n\n` +
+        `${backup.entries.length} entries, ${(backup.photos || []).length} photos\n` +
+        `Saved: ${new Date(backup.timestamp).toLocaleString()}\n\n` +
+        `This will REPLACE your current data.`;
+    if (!confirm(msg)) return;
+
+    entries = backup.entries || [];
+    saveEntries();
+
+    if (backup.addressOverrides) {
+        addressOverrides = backup.addressOverrides;
+        saveAddressOverrides();
+    }
+
+    if (backup.locationLog) {
+        locationLog = backup.locationLog;
+        saveLocationLog();
+    }
+
+    if (backup.photos && backup.photos.length > 0 && photoDB) {
+        const tx = photoDB.transaction('photos', 'readwrite');
+        const store = tx.objectStore('photos');
+        store.clear();
+        backup.photos.forEach(p => store.put(p));
+        await new Promise(r => tx.oncomplete = r);
+        photoCountsCache = null;
+    }
+
+    renderEntries();
+    hideBackupView();
+    alert(`✅ Restored backup from ${backup.date}.\n${entries.length} entries, ${(backup.photos || []).length} photos.`);
+}
+
+async function deleteBackup(date) {
+    if (!confirm(`Delete backup from ${date}?`)) return;
+    if (!photoDB || !photoDB.objectStoreNames.contains('backups')) return;
+    await new Promise(resolve => {
+        const tx = photoDB.transaction('backups', 'readwrite');
+        tx.objectStore('backups').delete(date);
+        tx.oncomplete = resolve;
+    });
+    showBackupView();
+}
+
+function showBackupStatus(msg) {
+    const el = document.getElementById('backupStatus');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 4000);
+}
+
+async function showBackupView() {
+    document.getElementById('todaySection').classList.add('hidden');
+    document.getElementById('globalSearchSection').classList.add('hidden');
+    document.getElementById('categorySelection').classList.add('hidden');
+    document.getElementById('backupView').classList.remove('hidden');
+
+    const list = document.getElementById('backupList');
+    list.innerHTML = '<div class="no-entries">Loading backups...</div>';
+
+    const backups = await listBackups();
+    if (backups.length === 0) {
+        list.innerHTML = '<div class="no-entries">No auto-backups yet.<br>Backups are created automatically at the end of each day.</div>';
+        return;
+    }
+
+    list.innerHTML = backups.map(b => {
+        const d = new Date(b.timestamp);
+        const dateLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        const timeLabel = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        return `
+            <div class="backup-entry">
+                <div class="backup-entry-info">
+                    <div class="backup-entry-date">${dateLabel}</div>
+                    <div class="backup-entry-details">${b.entryCount} entries · ${b.photoCount} photos · ${timeLabel}</div>
+                </div>
+                <div class="backup-entry-actions">
+                    <button class="btn-edit" onclick="restoreFromBackup('${b.date}')">Restore</button>
+                    <button class="btn-delete-log" onclick="deleteBackup('${b.date}')">✕</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function hideBackupView() {
+    document.getElementById('backupView').classList.add('hidden');
+    document.getElementById('todaySection').classList.remove('hidden');
+    document.getElementById('globalSearchSection').classList.remove('hidden');
+    document.getElementById('categorySelection').classList.remove('hidden');
+}
+
+function startBackupSchedule() {
+    // Check on app open
+    autoBackup();
+
+    // Check every 30 minutes (catches day rollover if app stays open)
+    backupCheckInterval = setInterval(() => {
+        const lastBackup = localStorage.getItem('lastAutoBackup');
+        if (lastBackup !== getTodayDateString()) {
+            autoBackup();
+        }
+    }, 30 * 60 * 1000);
+}
 
 // ============================================
 // GPS LOCATION LOG

@@ -92,8 +92,17 @@
             <div id="entriesList"></div>
             <div id="totalHours"></div>
             <button id="viewPastBtn" class="btn btn-secondary">📅 View Past Entries</button>
+            <button id="viewBackupsBtn" class="btn btn-secondary">🔄 Auto-Backups</button>
             <button id="exportDataBtn" class="btn btn-secondary">💾 Export Backup</button>
             <button id="importDataBtn" class="btn btn-secondary">📂 Import Backup</button>
+            <div id="backupStatus" class="backup-status hidden"></div>
+        </div>
+
+        <div id="backupView" class="hidden">
+            <button id="backFromBackupsBtn" class="btn-back">← Back to Today</button>
+            <h2>Auto-Backups</h2>
+            <p class="backup-description">Backups are saved automatically at the end of each day. Last 7 days are kept on this device.</p>
+            <div id="backupList"></div>
         </div>
         
         <div id="calendarView" class="hidden">
@@ -131,7 +140,7 @@
         <input type="file" id="photoFileInput" accept="image/*" style="display:none;">
 
         <div class="site-link"><a href="https://nemhello.github.io/Time-Tracker-Pro/" target="_blank">nemhello.github.io/Time-Tracker-Pro</a></div>
-        <div class="version">v4.5.8</div>
+        <div class="version">v4.6.0</div>
     </div>
 
     <script src="locations.js"></script>
