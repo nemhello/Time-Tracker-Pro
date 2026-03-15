@@ -138,13 +138,6 @@ const CATEGORIES = {
         { name: "(Jackson County) Lone Jack ISR", chargeCodeSZ: "SZ02B0405", chargeCodeMOS: "", address: "" },
         { name: "(Jackson County) Oak Grove ISR", chargeCodeSZ: "SZ02B0406", chargeCodeMOS: "", address: "" },
     ],
-    "Miscellaneous": [
-        { name: "AIS Logging Dispatch Co-Located with Master Site", chargeCodeSZ: "SZ02B04D105", chargeCodeMOS: "", address: "" },
-        { name: "Tower Park (CCGW Only)", chargeCodeSZ: "SZ02B04D14", chargeCodeMOS: "", address: "" },
-        { name: "Training", chargeCodeSZ: "", chargeCodeMOS: "", address: "" },
-        { name: "Miscellaneous", chargeCodeSZ: "", chargeCodeMOS: "", address: "" }
-
-    ],
     "Lees Summit": [
         { name: "Every RF Sub-Site", chargeCodeSZ: "SZ02B040702", chargeCodeMOS: "", address: "" },
         { name: "Ranson RF Sub-Site", chargeCodeSZ: "SZ02B040703", chargeCodeMOS: "", address: "" },
@@ -158,5 +151,11 @@ const CATEGORIES = {
         { name: "Leeton RF Sub-Site", chargeCodeSZ: "SZ02B040904", chargeCodeMOS: "", address: "" },
         { name: "Rosehill RF Sub-Site", chargeCodeSZ: "SZ02B040906", chargeCodeMOS: "", address: "" },
         { name: "Warrensburg RF Sub-Site", chargeCodeSZ: "SZ02B040902", chargeCodeMOS: "", address: "" },
+    ],
+    "Miscellaneous": [
+        { name: "AIS Logging Dispatch Co-Located with Master Site", chargeCodeSZ: "SZ02B04D105", chargeCodeMOS: "", address: "" },
+        { name: "Tower Park (CCGW Only)", chargeCodeSZ: "SZ02B04D14", chargeCodeMOS: "", address: "" },
+        { name: "Training", chargeCodeSZ: "", chargeCodeMOS: "", address: "" },
+        { name: "Miscellaneous", chargeCodeSZ: "", chargeCodeMOS: "", address: "" }
     ],
 };
