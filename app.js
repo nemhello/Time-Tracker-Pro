@@ -326,17 +326,23 @@ async function renderLocationList() {
 // Location Details - WITH PHOTO BUTTON
 async function showLocationDetails(name, chargeCodeSZ, chargeCodeMOS, address, category) {
     selectedLocation = { name, chargeCodeSZ, chargeCodeMOS, address, category };
-    currentLocationPhotos = await loadLocationPhotos(name);
+    currentLocationPhotos = [];
     photoViewMode = false;
-    
+
     if (name === 'Training') { confirmStartTimer(); return; }
-    
+
+    // Show screen immediately, no waiting
     document.getElementById('locationSelection').classList.add('hidden');
     document.getElementById('globalSearchSection').classList.add('hidden');
     document.getElementById('categorySelection').classList.add('hidden');
     document.getElementById('locationDetails').classList.remove('hidden');
-    
     renderLocationDetailsView();
+
+    // Load photos in background, update when ready
+    loadLocationPhotos(name).then(photos => {
+        currentLocationPhotos = photos;
+        if (!photoViewMode) renderLocationDetailsView();
+    });
 }
 
 function renderLocationDetailsView() {
