@@ -305,7 +305,12 @@ function clearSearch() {
 // Categories
 function renderCategories() {
     const list = document.getElementById('categoryList');
-    list.innerHTML = Object.keys(CATEGORIES).map(cat => `
+    const cats = Object.keys(CATEGORIES).sort((a, b) => {
+        if (a === 'Miscellaneous') return 1;
+        if (b === 'Miscellaneous') return -1;
+        return 0;
+    });
+    list.innerHTML = cats.map(cat => `
         <div class="category-card" onclick="selectCategory('${escapeHtml(cat)}')">
             <div class="category-name">${cat}</div>
             <div class="category-count">${CATEGORIES[cat].length} locations</div>
@@ -1080,9 +1085,9 @@ function renderCalendar() {
     
     let html = `
         <div class="calendar-nav">
-            <button onclick="previousMonth()">\u2190 Previous</button>
+            <button onclick="previousMonth()">← Prev</button>
             <div class="calendar-month-header">${monthNames[month]} ${year}</div>
-            <button onclick="nextMonth()">Next \u2192</button>
+            <button onclick="nextMonth()">Next →</button>
         </div>
         <div class="calendar-month">
     `;
@@ -1336,14 +1341,14 @@ async function exportData() {
         photos: allPhotos,
         addressOverrides: addressOverrides,
         exportDate: new Date().toISOString(),
-        version: 'v4.5.0'
+        version: 'v5.0.0'
     };
     
     const dataStr = JSON.stringify(data, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const date = new Date().toISOString().split('T')[0];
-    const filename = `time-tracker-backup-${date}.json`;
+    const filename = `timevault-backup-${date}.json`;
     
     const a = document.createElement('a');
     a.href = url;
@@ -1370,7 +1375,7 @@ function importData() {
                 try {
                     data = JSON.parse(raw);
                 } catch (parseErr) {
-                    alert('✘ This file is not valid JSON.\n\nMake sure you selected a Time Tracker backup file (.json).');
+                    alert('✘ This file is not valid JSON.\n\nMake sure you selected a TimeVault backup file (.json).');
                     return;
                 }
 
@@ -1393,7 +1398,7 @@ function importData() {
                     if (data.exportDate) exportInfo = `\nBackup from: ${new Date(data.exportDate).toLocaleString()}`;
                     if (data.version) exportInfo += `\nVersion: ${data.version}`;
                 } else {
-                    alert('✘ Unrecognized backup format.\n\nThis file does not contain Time Tracker data.');
+                    alert('✘ Unrecognized backup format.\n\nThis file does not contain TimeVault data.');
                     return;
                 }
 

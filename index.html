@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1e40af"> 
-    <title>Time Tracker Pro</title>
+    <title>TimeVault</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="styles.css">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -14,7 +14,7 @@
 <body>
     <div id="app">
         <header>
-            <h1>⏱️ Time Tracker Pro</h1>
+            <h1>🔒 TimeVault</h1>
             <div id="currentDate"></div>
         </header>
 
@@ -139,15 +139,22 @@
         <input type="file" id="photoCameraInput" accept="image/*" capture="environment" style="display:none;">
         <input type="file" id="photoFileInput" accept="image/*" style="display:none;">
 
-        <div class="site-link"><a href="https://nemhello.github.io/Time-Tracker-Pro/" target="_blank">nemhello.github.io/Time-Tracker-Pro</a></div>
-        <div class="version">v4.6.4</div>
+        <div class="site-link"><a href="https://timevault.wilkerson-labs.com" target="_blank">timevault.wilkerson-labs.com</a></div>
+        <div class="version">v5.0.1</div>
     </div>
 
     <script src="locations.js"></script>
     <script src="app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js');
+            navigator.serviceWorker.register('service-worker.js').then(reg => {
+                // Force update check every time the app opens
+                reg.update();
+                // Also check when the app comes back from background
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') reg.update();
+                });
+            });
         }
     </script>
 </body>

@@ -1,11 +1,11 @@
-const CACHE_NAME = 'time-tracker-pro-v4.6.4';
+const CACHE_NAME = 'timevault-v5.0.1';
 const urlsToCache = [
-  '/Time-Tracker-Pro/',
-  '/Time-Tracker-Pro/index.html',
-  '/Time-Tracker-Pro/styles.css',
-  '/Time-Tracker-Pro/app.js',
-  '/Time-Tracker-Pro/locations.js',
-  '/Time-Tracker-Pro/manifest.json'
+  './',
+  './index.html',
+  './styles.css',
+  './app.js',
+  './locations.js',
+  './manifest.json'
 ];
 
 self.addEventListener('install', event => {

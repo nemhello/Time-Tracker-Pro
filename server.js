@@ -41,6 +41,8 @@ requiredVars.forEach(varName => {
 app.use(cors({
     origin: [
         'https://nemhello.github.io',
+        'https://timevault.wilkerson-labs.com',
+        'https://wilkerson-labs.com',
         'http://localhost:3000',
         'http://localhost:8080',
     ],
@@ -465,7 +467,7 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
     console.log('='.repeat(50));
-    console.log('🔒 Field Assistant Auth Backend v4.0.1');
+    console.log('🔒 TimeVault Auth Backend v5.0.0');
     console.log('='.repeat(50));
     console.log(`✅ Server running on port ${PORT}`);
     console.log(`✅ API URL: ${CONFIG.apiUrl}`);
