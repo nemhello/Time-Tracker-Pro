@@ -1356,41 +1356,73 @@ async function exportData() {
 function importData() {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.json';
-    
+    input.accept = '.json,application/json,text/plain,*/*';
+
     input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        
+
         const reader = new FileReader();
         reader.onload = async (event) => {
             try {
-                const data = JSON.parse(event.target.result);
-                if (!data.entries || !Array.isArray(data.entries)) {
-                    alert('✘ Invalid backup file');
+                const raw = event.target.result.trim();
+                let data;
+                try {
+                    data = JSON.parse(raw);
+                } catch (parseErr) {
+                    alert('✘ This file is not valid JSON.\n\nMake sure you selected a Time Tracker backup file (.json).');
                     return;
                 }
-                
-                const photoCount = (data.photos || []).length;
-                const confirmMsg = `Import ${data.entries.length} entries and ${photoCount} photos?\n\nThis will REPLACE your current data.\n\nBackup exported: ${new Date(data.exportDate).toLocaleString()}`;
-                
+
+                // Support both old and new backup formats
+                let importEntries = null;
+                let importPhotos = [];
+                let importOverrides = null;
+                let importLocationLog = null;
+                let exportInfo = '';
+
+                if (Array.isArray(data)) {
+                    // Bare array of entries (very old format)
+                    importEntries = data;
+                } else if (data.entries && Array.isArray(data.entries)) {
+                    // Standard format
+                    importEntries = data.entries;
+                    importPhotos = data.photos || [];
+                    importOverrides = data.addressOverrides || null;
+                    importLocationLog = data.locationLog || null;
+                    if (data.exportDate) exportInfo = `\nBackup from: ${new Date(data.exportDate).toLocaleString()}`;
+                    if (data.version) exportInfo += `\nVersion: ${data.version}`;
+                } else {
+                    alert('✘ Unrecognized backup format.\n\nThis file does not contain Time Tracker data.');
+                    return;
+                }
+
+                const photoCount = importPhotos.length;
+                const confirmMsg = `Import ${importEntries.length} entries and ${photoCount} photos?\n\nThis will REPLACE your current data.${exportInfo}`;
+
                 if (confirm(confirmMsg)) {
-                    entries = data.entries;
+                    entries = importEntries;
                     saveEntries();
-                    
-                    if (data.addressOverrides) {
-                        addressOverrides = data.addressOverrides;
+
+                    if (importOverrides) {
+                        addressOverrides = importOverrides;
                         saveAddressOverrides();
                     }
-                    
-                    if (data.photos && data.photos.length > 0 && photoDB) {
+
+                    if (importLocationLog) {
+                        locationLog = importLocationLog;
+                        saveLocationLog();
+                    }
+
+                    if (importPhotos.length > 0 && photoDB) {
                         const tx = photoDB.transaction('photos', 'readwrite');
                         const store = tx.objectStore('photos');
                         store.clear();
-                        data.photos.forEach(p => store.put(p));
+                        importPhotos.forEach(p => store.put(p));
                         await new Promise(r => tx.oncomplete = r);
+                        photoCountsCache = null;
                     }
-                    
+
                     renderEntries();
                     alert(`✅ Imported ${entries.length} entries and ${photoCount} photos successfully!`);
                 }
