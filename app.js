@@ -1080,9 +1080,9 @@ function renderCalendar() {
     
     let html = `
         <div class="calendar-nav">
-            <button onclick="previousMonth()">â† Previous</button>
+            <button onclick="previousMonth()">\u2190 Previous</button>
             <div class="calendar-month-header">${monthNames[month]} ${year}</div>
-            <button onclick="nextMonth()">Next â†’</button>
+            <button onclick="nextMonth()">Next \u2192</button>
         </div>
         <div class="calendar-month">
     `;
