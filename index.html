@@ -115,10 +115,27 @@
             <div id="calendarContainer"></div>
             <div id="pastEntriesDetail" class="hidden">
                 <h3 id="selectedDateTitle"></h3>
+                <div id="dayOffBanner" class="hidden"></div>
                 <div id="selectedDateEntries"></div>
             </div>
         </div>
         
+        <div id="dayOffModal" class="modal hidden">
+            <div class="modal-content">
+                <h3>Mark Day Off</h3>
+                <div class="day-off-types">
+                    <button class="day-off-type-btn" data-type="PTO" onclick="selectDayOffType(this)">🏖 PTO</button>
+                    <button class="day-off-type-btn" data-type="Sick" onclick="selectDayOffType(this)">🤒 Sick</button>
+                    <button class="day-off-type-btn" data-type="Holiday" onclick="selectDayOffType(this)">🎉 Holiday</button>
+                    <button class="day-off-type-btn" data-type="Personal" onclick="selectDayOffType(this)">👤 Personal</button>
+                    <button class="day-off-type-btn" data-type="Other" onclick="selectDayOffType(this)">⛔ Other</button>
+                </div>
+                <textarea id="dayOffNote" class="notes-field" placeholder="Note (optional)..."></textarea>
+                <button class="btn btn-primary" onclick="confirmDayOff()">Confirm</button>
+                <button class="btn btn-secondary" onclick="cancelDayOff()">Cancel</button>
+            </div>
+        </div>
+
         <div id="codeModal" class="modal hidden">
             <div class="modal-content">
                 <h3>Which code to use?</h3>
@@ -140,7 +157,7 @@
         <input type="file" id="photoFileInput" accept="image/*" style="display:none;">
 
         <div class="site-link"><a href="./" onclick="event.preventDefault();location.reload();">timevault.wilkerson-labs.com</a></div>
-        <div class="version">v5.0.4</div>
+        <div class="version">v5.0.5</div>
     </div>
 
     <script src="locations.js"></script>

@@ -43,6 +43,30 @@ let currentCalendarDate = new Date();
 let addressOverrides = {};
 let lastViewedDate = null;
 let searchDebounceTimer = null;
+let daysOff = JSON.parse(localStorage.getItem('daysOff') || '{}');
+
+function saveDaysOff() { localStorage.setItem('daysOff', JSON.stringify(daysOff)); }
+
+function getDayOffKey(year, month, day) {
+    return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function markDayOff(year, month, day, type, note) {
+    const key = getDayOffKey(year, month, day);
+    daysOff[key] = { type, note: note || '' };
+    saveDaysOff();
+}
+
+function getDayOffEmoji(type) {
+    const emojis = { 'PTO': '🏖', 'Sick': '🤒', 'Holiday': '🎉', 'Personal': '👤', 'Other': '⛔' };
+    return emojis[type] || '⛔';
+}
+
+function removeDayOff(year, month, day) {
+    const key = getDayOffKey(year, month, day);
+    delete daysOff[key];
+    saveDaysOff();
+}
 
 function persistPhotoState() {
     if (selectedLocation) sessionStorage.setItem('photoLocation', JSON.stringify(selectedLocation));
@@ -1105,12 +1129,16 @@ function renderCalendar() {
     for (let day = 1; day <= daysInMonth; day++) {
         const isToday = (day === today.getDate() && month === today.getMonth() && year === today.getFullYear());
         const hasEntries = datesWithEntries.has(day);
-        
+        const dayOffKey = getDayOffKey(year, month, day);
+        const dayOff = daysOff[dayOffKey];
+
         let classes = 'calendar-day';
         if (isToday) classes += ' today';
         if (hasEntries) classes += ' has-entries';
-        
-        html += `<div class="${classes}" onclick="showDateEntries(${year}, ${month}, ${day})">${day}</div>`;
+        if (dayOff) classes += ' day-off';
+
+        const label = dayOff ? `<span class="day-num">${day}</span><span class="day-off-icon">${getDayOffEmoji(dayOff.type)}</span>` : day;
+        html += `<div class="${classes}" onclick="showDateEntries(${year}, ${month}, ${day})">${label}</div>`;
     }
     
     html += '</div>';
@@ -1131,16 +1159,90 @@ function showDateEntries(year, month, day) {
     lastViewedDate = { year, month, day };
     const targetDate = new Date(year, month, day);
     const dateString = targetDate.toDateString();
-    
+    const dayOffKey = getDayOffKey(year, month, day);
+    const dayOff = daysOff[dayOffKey];
+
     const dateEntries = entries.filter(e => new Date(e.startTime).toDateString() === dateString);
-    if (dateEntries.length === 0) return;
-    
-    document.getElementById('selectedDateTitle').textContent = targetDate.toLocaleDateString('en-US', {
+
+    const dateLabel = targetDate.toLocaleDateString('en-US', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
-    
-    renderPastEntriesForDate(dateEntries);
+
+    document.getElementById('selectedDateTitle').textContent = dateLabel;
+
+    if (dateEntries.length === 0 && !dayOff) {
+        // No entries and not marked off — offer to mark as day off
+        openDayOffModal(year, month, day);
+        return;
+    }
+
+    if (dayOff) {
+        renderDayOffBanner(dayOff, year, month, day);
+    } else {
+        document.getElementById('dayOffBanner').classList.add('hidden');
+    }
+
+    if (dateEntries.length > 0) {
+        renderPastEntriesForDate(dateEntries);
+    } else {
+        document.getElementById('selectedDateEntries').innerHTML = '';
+    }
     document.getElementById('pastEntriesDetail').classList.remove('hidden');
+}
+
+function renderDayOffBanner(dayOff, year, month, day) {
+    const banner = document.getElementById('dayOffBanner');
+    banner.innerHTML = `
+        <div class="day-off-banner-content">
+            <span class="day-off-banner-type">${getDayOffEmoji(dayOff.type)} ${dayOff.type}</span>
+            ${dayOff.note ? `<span class="day-off-banner-note">${dayOff.note}</span>` : ''}
+            <button class="btn-edit" onclick="removeDayOffAndRefresh(${year}, ${month}, ${day})">Remove</button>
+        </div>
+    `;
+    banner.classList.remove('hidden');
+}
+
+function openDayOffModal(year, month, day) {
+    const modal = document.getElementById('dayOffModal');
+    modal.dataset.year = year;
+    modal.dataset.month = month;
+    modal.dataset.day = day;
+    document.getElementById('dayOffNote').value = '';
+    document.querySelectorAll('.day-off-type-btn').forEach(b => b.classList.remove('selected'));
+    modal.classList.remove('hidden');
+}
+
+function selectDayOffType(btn) {
+    document.querySelectorAll('.day-off-type-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+}
+
+function confirmDayOff() {
+    const modal = document.getElementById('dayOffModal');
+    const selected = document.querySelector('.day-off-type-btn.selected');
+    if (!selected) { alert('Please select an absence type.'); return; }
+    const type = selected.dataset.type;
+    const note = document.getElementById('dayOffNote').value.trim();
+    const year = parseInt(modal.dataset.year);
+    const month = parseInt(modal.dataset.month);
+    const day = parseInt(modal.dataset.day);
+    markDayOff(year, month, day, type, note);
+    modal.classList.add('hidden');
+    renderCalendar();
+    showDateEntries(year, month, day);
+}
+
+function cancelDayOff() {
+    document.getElementById('dayOffModal').classList.add('hidden');
+}
+
+function removeDayOffAndRefresh(year, month, day) {
+    if (confirm('Remove this day off?')) {
+        removeDayOff(year, month, day);
+        document.getElementById('dayOffBanner').classList.add('hidden');
+        document.getElementById('pastEntriesDetail').classList.add('hidden');
+        renderCalendar();
+    }
 }
 
 function renderPastEntriesForDate(dateEntries) {
@@ -1340,8 +1442,9 @@ async function exportData() {
         entries: entries,
         photos: allPhotos,
         addressOverrides: addressOverrides,
+        daysOff: daysOff,
         exportDate: new Date().toISOString(),
-        version: 'v5.0.0'
+        version: 'v5.0.5'
     };
     
     const dataStr = JSON.stringify(data, null, 2);
@@ -1395,6 +1498,7 @@ function importData() {
                     importPhotos = data.photos || [];
                     importOverrides = data.addressOverrides || null;
                     importLocationLog = data.locationLog || null;
+                    var importDaysOff = data.daysOff || null;
                     if (data.exportDate) exportInfo = `\nBackup from: ${new Date(data.exportDate).toLocaleString()}`;
                     if (data.version) exportInfo += `\nVersion: ${data.version}`;
                 } else {
@@ -1417,6 +1521,11 @@ function importData() {
                     if (importLocationLog) {
                         locationLog = importLocationLog;
                         saveLocationLog();
+                    }
+
+                    if (importDaysOff) {
+                        daysOff = importDaysOff;
+                        saveDaysOff();
                     }
 
                     if (importPhotos.length > 0 && photoDB) {
@@ -1493,6 +1602,7 @@ async function autoBackup() {
             photos: allPhotos,
             addressOverrides: addressOverrides,
             locationLog: locationLog || [],
+            daysOff: daysOff,
             version: document.querySelector('.version')?.textContent || 'unknown'
         };
 
@@ -1582,6 +1692,11 @@ async function restoreFromBackup(date) {
     if (backup.locationLog) {
         locationLog = backup.locationLog;
         saveLocationLog();
+    }
+
+    if (backup.daysOff) {
+        daysOff = backup.daysOff;
+        saveDaysOff();
     }
 
     if (backup.photos && backup.photos.length > 0 && photoDB) {
