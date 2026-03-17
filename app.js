@@ -1734,13 +1734,16 @@ async function logCurrentLocation() {
                 // fall back to coords
             }
 
+            const note = prompt('What did you do here? (optional):');
+
             const entry = {
                 id: Date.now(),
                 timestamp: new Date().toISOString(),
                 address,
                 lat: latitude,
                 lon: longitude,
-                accuracy: Math.round(accuracy)
+                accuracy: Math.round(accuracy),
+                note: (note && note.trim()) ? note.trim() : ''
             };
 
             locationLog.unshift(entry);
@@ -1792,6 +1795,7 @@ function renderLocationLog() {
                 <div class="log-entry-info">
                     <div class="log-entry-time">${dateStr} ${timeStr} · ±${entry.accuracy}m</div>
                     <div class="log-entry-address">${entry.address}</div>
+                    ${entry.note ? `<div class="log-entry-note">📝 ${entry.note}</div>` : ''}
                     <div class="log-entry-coords">${entry.lat.toFixed(5)}, ${entry.lon.toFixed(5)}</div>
                 </div>
                 <button class="btn-delete-log" onclick="deleteLogEntry(${entry.id})">✕</button>
@@ -1826,17 +1830,15 @@ function smsLocationLog() {
 
     localStorage.setItem('smsPhone', phone);
 
-    const note = prompt('Add a note to the SMS (optional):');
-
     const body = locationLog.map(entry => {
         const dt = new Date(entry.timestamp);
         const dateStr = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         const timeStr = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-        return `${dateStr} ${timeStr}\n${entry.address}`;
+        let line = `${dateStr} ${timeStr}\n${entry.address}`;
+        if (entry.note) line += `\n- ${entry.note}`;
+        return line;
     }).join('\n\n');
 
-    let smsText = `Location Log:\n\n${body}`;
-    if (note && note.trim()) smsText += `\n\nNote: ${note.trim()}`;
-    const smsBody = encodeURIComponent(smsText);
+    const smsBody = encodeURIComponent(`Location Log:\n\n${body}`);
     window.location.href = `sms:${phone}?body=${smsBody}`;
 }

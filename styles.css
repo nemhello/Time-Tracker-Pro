@@ -1421,6 +1421,13 @@ header h1 {
     line-height: 1.3;
 }
 
+.log-entry-note {
+    font-size: 13px;
+    color: #d1d5db;
+    margin-top: 4px;
+    font-style: italic;
+}
+
 .log-entry-coords {
     font-size: 11px;
     color: #9ca3af;
