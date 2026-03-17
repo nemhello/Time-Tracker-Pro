@@ -810,7 +810,7 @@ function showActiveTimer() {
     const addressLink = document.getElementById('activeAddress');
     if (activeEntry.address && activeEntry.address.trim() !== '') {
         addressLink.href = `https://maps.apple.com/?q=${encodeURIComponent(activeEntry.address)}`;
-        addressLink.textContent = `ðŸ“ ${activeEntry.address}`;
+        addressLink.textContent = `📍 ${activeEntry.address}`;
         addressLink.style.display = 'block';
     } else {
         addressLink.style.display = 'none';
@@ -940,7 +940,7 @@ function renderEntries() {
                 ${entry.workOrder ? `<div class="entry-workorder">WO #${entry.workOrder}</div>` : ''}
                 <div class="entry-time">${formatTime(start)} - ${formatTime(end)}</div>
                 <div class="entry-duration">${formatDuration(duration)}</div>
-                ${entry.notes ? `<div class="entry-notes">ðŸ“ ${entry.notes}</div>` : ''}
+                ${entry.notes ? `<div class="entry-notes">📝 ${entry.notes}</div>` : ''}
             </div>
         `;
     }).join('');
@@ -1826,6 +1826,8 @@ function smsLocationLog() {
 
     localStorage.setItem('smsPhone', phone);
 
+    const note = prompt('Add a note to the SMS (optional):');
+
     const body = locationLog.map(entry => {
         const dt = new Date(entry.timestamp);
         const dateStr = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -1833,6 +1835,8 @@ function smsLocationLog() {
         return `${dateStr} ${timeStr}\n${entry.address}`;
     }).join('\n\n');
 
-    const smsBody = encodeURIComponent(`Location Log:\n\n${body}`);
+    let smsText = `Location Log:\n\n${body}`;
+    if (note && note.trim()) smsText += `\n\nNote: ${note.trim()}`;
+    const smsBody = encodeURIComponent(smsText);
     window.location.href = `sms:${phone}?body=${smsBody}`;
 }
