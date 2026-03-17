@@ -1,4 +1,4 @@
-const CACHE_NAME = 'timevault-v5.0.3';
+const CACHE_NAME = 'timevault-v5.0.4';
 const urlsToCache = [
   './',
   './index.html',
