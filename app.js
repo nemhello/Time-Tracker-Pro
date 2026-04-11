@@ -976,22 +976,33 @@ function closeAnnotationEditor() {
 
 function initPinchZoom(img) {
     let scale = 1, lastScale = 1;
-    let originX = 0, originY = 0;
-    let lastX = 0, lastY = 0;
+    let translateX = 0, translateY = 0;
+    let startDist = 0;
     let isPinching = false;
+    let panStartX = 0, panStartY = 0;
+    let panBaseX = 0, panBaseY = 0;
+    let isPanning = false;
+
+    function apply() {
+        img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+    }
 
     img.addEventListener('touchstart', e => {
         if (e.touches.length === 2) {
+            // Start pinch zoom
             isPinching = true;
+            isPanning = false;
             lastScale = scale;
             const dx = e.touches[0].clientX - e.touches[1].clientX;
             const dy = e.touches[0].clientY - e.touches[1].clientY;
-            originX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-            originY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-            img._pinchDist = Math.hypot(dx, dy);
+            startDist = Math.hypot(dx, dy);
         } else if (e.touches.length === 1 && scale > 1) {
-            lastX = e.touches[0].clientX - (img._translateX || 0);
-            lastY = e.touches[0].clientY - (img._translateY || 0);
+            // Start panning
+            isPanning = true;
+            panStartX = e.touches[0].clientX;
+            panStartY = e.touches[0].clientY;
+            panBaseX = translateX;
+            panBaseY = translateY;
         }
     }, { passive: true });
 
@@ -1001,38 +1012,61 @@ function initPinchZoom(img) {
             const dx = e.touches[0].clientX - e.touches[1].clientX;
             const dy = e.touches[0].clientY - e.touches[1].clientY;
             const dist = Math.hypot(dx, dy);
-            scale = Math.min(Math.max(lastScale * (dist / img._pinchDist), 1), 5);
-            applyTransform(img, scale);
-        } else if (e.touches.length === 1 && scale > 1) {
+            scale = Math.min(Math.max(lastScale * (dist / startDist), 1), 5);
+            apply();
+        } else if (e.touches.length === 1 && isPanning && scale > 1) {
             e.preventDefault();
-            img._translateX = e.touches[0].clientX - lastX;
-            img._translateY = e.touches[0].clientY - lastY;
-            applyTransform(img);
+            translateX = panBaseX + (e.touches[0].clientX - panStartX);
+            translateY = panBaseY + (e.touches[0].clientY - panStartY);
+            apply();
         }
     }, { passive: false });
 
     img.addEventListener('touchend', e => {
-        if (e.touches.length < 2) isPinching = false;
-        if (scale <= 1) { scale = 1; img._translateX = 0; img._translateY = 0; applyTransform(img, 1); }
+        if (e.touches.length < 2) {
+            isPinching = false;
+            // If we were pinching and one finger remains, start panning from that finger
+            if (e.touches.length === 1 && scale > 1) {
+                isPanning = true;
+                panStartX = e.touches[0].clientX;
+                panStartY = e.touches[0].clientY;
+                panBaseX = translateX;
+                panBaseY = translateY;
+            }
+        }
+        if (e.touches.length === 0) {
+            isPanning = false;
+            // Snap back if pinched below 1
+            if (scale <= 1) {
+                scale = 1;
+                translateX = 0;
+                translateY = 0;
+                apply();
+            }
+        }
     }, { passive: true });
 
-    // Double-tap to reset
+    // Double-tap to reset zoom
     let lastTap = 0;
     img.addEventListener('touchend', e => {
+        if (e.touches.length > 0) return;
         const now = Date.now();
         if (now - lastTap < 300) {
-            scale = 1; img._translateX = 0; img._translateY = 0; applyTransform(img, 1);
+            if (scale > 1) {
+                // Reset
+                scale = 1;
+                translateX = 0;
+                translateY = 0;
+            } else {
+                // Zoom to 2.5x
+                scale = 2.5;
+                translateX = 0;
+                translateY = 0;
+            }
+            apply();
         }
         lastTap = now;
     }, { passive: true });
-}
-
-function applyTransform(img, s) {
-    if (s !== undefined) img._currentScale = s;
-    const sc = img._currentScale || 1;
-    const tx = img._translateX || 0;
-    const ty = img._translateY || 0;
-    img.style.transform = `translate(${tx}px, ${ty}px) scale(${sc})`;
 }
 
 function closePhotoViewer() {
@@ -1747,7 +1781,7 @@ async function exportData() {
         addressOverrides: addressOverrides,
         daysOff: daysOff,
         exportDate: new Date().toISOString(),
-        version: 'v5.1.0'
+        version: 'v5.1.1'
     };
     
     const dataStr = JSON.stringify(data, null, 2);
