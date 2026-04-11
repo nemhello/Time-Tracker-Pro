@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Wire persistent file inputs (survive iOS camera reload)
     document.getElementById('photoCameraInput').addEventListener('change', handlePhotoFile);
-    document.getElementById('photoFileInput').addEventListener('change', handlePhotoFile);
+    document.getElementById('photoFileInput').addEventListener('change', handlePhotoFiles);
 
     setTimeout(() => {
         const clearBtn = document.getElementById('clearSearchBtn');
@@ -549,8 +549,9 @@ function renderPhotoGrid() {
             <img src="${photo.url}" alt="Photo ${index + 1}" loading="lazy">
             <div class="photo-overlay">
                 <div class="photo-date">${formatPhotoDate(photo.timestamp)}</div>
-                📱
+                ${photo.label ? '🏷️' : '📱'}
             </div>
+            ${photo.label ? `<div class="photo-label-badge">${escapeHtml(photo.label)}</div>` : ''}
         </div>
     `).join('');
 }
@@ -583,29 +584,69 @@ async function handlePhotoFile(event) {
     event.target.value = '';
 }
 
+async function handlePhotoFiles(event) {
+    const files = Array.from(event.target.files);
+    if (!files.length) return;
+    const images = files.filter(f => f.type.startsWith('image/'));
+    if (images.length === 0) {
+        alert('Please select image files.');
+        event.target.value = '';
+        return;
+    }
+    showLoadingIndicator(`Saving ${images.length} photo${images.length > 1 ? 's' : ''}...`);
+    try {
+        if (!selectedLocation) throw new Error('Location lost - please go back and try again');
+        for (let i = 0; i < images.length; i++) {
+            const dataUrl = await readFileAsDataUrl(images[i]);
+            const photoData = {
+                id: (Date.now() + i).toString(),
+                url: dataUrl,
+                timestamp: Date.now() + i,
+                location: selectedLocation.name,
+                label: '',
+                storage: 'local'
+            };
+            await savePhotoToDB(photoData);
+        }
+        currentLocationPhotos = await loadLocationPhotos(selectedLocation.name);
+        hideLoadingIndicator();
+        if (photoViewMode) showPhotoGallery();
+    } catch (error) {
+        console.error('Photo save failed:', error);
+        hideLoadingIndicator();
+        alert('Photo save failed: ' + error.message);
+    }
+    event.target.value = '';
+}
+
+function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
 // Photo Save - Local IndexedDB (no server needed)
 async function savePhotoLocally(photoBlob) {
     showLoadingIndicator('Saving photo...');
     try {
-        const reader = new FileReader();
-        const dataUrl = await new Promise((resolve, reject) => {
-            reader.onload = e => resolve(e.target.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(photoBlob);
-        });
-        
+        const dataUrl = await readFileAsDataUrl(photoBlob);
+
         if (!selectedLocation) throw new Error('Location lost - please go back and try again');
         const photoData = {
             id: Date.now().toString(),
             url: dataUrl,
             timestamp: Date.now(),
             location: selectedLocation.name,
+            label: '',
             storage: 'local'
         };
-        
+
         await savePhotoToDB(photoData);
         currentLocationPhotos = await loadLocationPhotos(selectedLocation.name);
-        
+
         hideLoadingIndicator();
         if (photoViewMode) showPhotoGallery();
     } catch (error) {
@@ -641,9 +682,15 @@ function hideLoadingIndicator() {
 }
 
 // Photo Viewer
+let currentViewerIndex = -1;
+
 function viewFullPhoto(index) {
     const photo = currentLocationPhotos[index];
     if (!photo) return;
+    currentViewerIndex = index;
+
+    const existingViewer = document.querySelector('.photo-viewer-overlay');
+    if (existingViewer) document.body.removeChild(existingViewer);
 
     const viewer = document.createElement('div');
     viewer.className = 'photo-viewer-overlay';
@@ -653,12 +700,20 @@ function viewFullPhoto(index) {
                 <button onclick="closePhotoViewer()">✕ Close</button>
                 <div class="photo-info">${index + 1} / ${currentLocationPhotos.length}</div>
             </div>
+            <div class="photo-label-row">
+                <input type="text" id="photoLabelInput" class="photo-label-input" placeholder="Add a label..." value="${escapeAttr(photo.label || '')}" maxlength="100">
+                <button class="btn-label-save" onclick="savePhotoLabel(${index})">Save</button>
+            </div>
             <div class="photo-zoom-container" id="photoZoomContainer">
                 <img id="photoViewerImg" src="${photo.url}" alt="Photo" style="touch-action:none;transform-origin:center center;">
+            </div>
+            <div class="photo-viewer-actions">
+                <button class="btn-annotate" onclick="openAnnotationEditor(${index})">✏️ Draw</button>
             </div>
             <div class="photo-viewer-footer">
                 <div>${selectedLocation.name}</div>
                 <div>${new Date(photo.timestamp).toLocaleString()}</div>
+                ${photo.label ? `<div class="photo-viewer-label">🏷️ ${escapeHtml(photo.label)}</div>` : ''}
             </div>
             <div class="photo-viewer-nav">
                 ${index > 0 ? `<button onclick="viewFullPhoto(${index - 1})">← Previous</button>` : '<div></div>'}
@@ -669,6 +724,254 @@ function viewFullPhoto(index) {
     `;
     document.body.appendChild(viewer);
     initPinchZoom(document.getElementById('photoViewerImg'));
+
+    // Save label on Enter
+    document.getElementById('photoLabelInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') savePhotoLabel(index);
+    });
+}
+
+async function savePhotoLabel(index) {
+    const photo = currentLocationPhotos[index];
+    if (!photo) return;
+    const input = document.getElementById('photoLabelInput');
+    const label = input ? input.value.trim() : '';
+    photo.label = label;
+    await savePhotoToDB(photo);
+    currentLocationPhotos = await loadLocationPhotos(selectedLocation.name);
+    viewFullPhoto(index);
+}
+
+// Annotation Editor - draw/write on photos
+function openAnnotationEditor(index) {
+    const photo = currentLocationPhotos[index];
+    if (!photo) return;
+
+    closePhotoViewer();
+
+    const editor = document.createElement('div');
+    editor.className = 'photo-viewer-overlay';
+    editor.id = 'annotationEditor';
+
+    editor.innerHTML = `
+        <div class="annotation-editor">
+            <div class="annotation-toolbar">
+                <button class="ann-tool active" data-tool="pen" onclick="setAnnotationTool('pen', this)">✏️ Pen</button>
+                <button class="ann-tool" data-tool="text" onclick="setAnnotationTool('text', this)">Aa Text</button>
+                <div class="ann-colors">
+                    <button class="ann-color active" style="background:#ff3b30" onclick="setAnnotationColor('#ff3b30', this)"></button>
+                    <button class="ann-color" style="background:#ffffff" onclick="setAnnotationColor('#ffffff', this)"></button>
+                    <button class="ann-color" style="background:#ffcc00" onclick="setAnnotationColor('#ffcc00', this)"></button>
+                    <button class="ann-color" style="background:#34c759" onclick="setAnnotationColor('#34c759', this)"></button>
+                    <button class="ann-color" style="background:#007aff" onclick="setAnnotationColor('#007aff', this)"></button>
+                </div>
+                <div class="ann-sizes">
+                    <button class="ann-size" onclick="setAnnotationSize(2, this)">S</button>
+                    <button class="ann-size active" onclick="setAnnotationSize(4, this)">M</button>
+                    <button class="ann-size" onclick="setAnnotationSize(8, this)">L</button>
+                </div>
+            </div>
+            <div class="annotation-canvas-wrap" id="annotationCanvasWrap">
+                <canvas id="annotationCanvas"></canvas>
+            </div>
+            <div class="annotation-footer">
+                <button class="btn btn-secondary" onclick="undoAnnotation()">↩ Undo</button>
+                <button class="btn btn-secondary" onclick="cancelAnnotation(${index})">Cancel</button>
+                <button class="btn btn-primary" onclick="saveAnnotation(${index})">Save</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(editor);
+    initAnnotationCanvas(photo);
+}
+
+let annTool = 'pen';
+let annColor = '#ff3b30';
+let annSize = 4;
+let annHistory = [];
+let annCanvas, annCtx, annImg;
+
+function setAnnotationTool(tool, btn) {
+    annTool = tool;
+    document.querySelectorAll('.ann-tool').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+function setAnnotationColor(color, btn) {
+    annColor = color;
+    document.querySelectorAll('.ann-color').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+function setAnnotationSize(size, btn) {
+    annSize = size;
+    document.querySelectorAll('.ann-size').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+function initAnnotationCanvas(photo) {
+    annCanvas = document.getElementById('annotationCanvas');
+    annCtx = annCanvas.getContext('2d');
+    annHistory = [];
+
+    annImg = new Image();
+    annImg.onload = () => {
+        const wrap = document.getElementById('annotationCanvasWrap');
+        const maxW = wrap.clientWidth;
+        const maxH = wrap.clientHeight;
+        const ratio = Math.min(maxW / annImg.width, maxH / annImg.height);
+        annCanvas.width = annImg.width * ratio;
+        annCanvas.height = annImg.height * ratio;
+        annCtx.drawImage(annImg, 0, 0, annCanvas.width, annCanvas.height);
+        saveAnnotationState();
+        setupAnnotationDrawing();
+    };
+    annImg.src = photo.url;
+}
+
+function saveAnnotationState() {
+    annHistory.push(annCanvas.toDataURL());
+}
+
+function undoAnnotation() {
+    if (annHistory.length <= 1) return;
+    annHistory.pop();
+    const img = new Image();
+    img.onload = () => {
+        annCtx.clearRect(0, 0, annCanvas.width, annCanvas.height);
+        annCtx.drawImage(img, 0, 0);
+    };
+    img.src = annHistory[annHistory.length - 1];
+}
+
+function setupAnnotationDrawing() {
+    let drawing = false;
+    let lastPos = null;
+
+    function getPos(e) {
+        const rect = annCanvas.getBoundingClientRect();
+        const scaleX = annCanvas.width / rect.width;
+        const scaleY = annCanvas.height / rect.height;
+        const touch = e.touches ? e.touches[0] : e;
+        return {
+            x: (touch.clientX - rect.left) * scaleX,
+            y: (touch.clientY - rect.top) * scaleY
+        };
+    }
+
+    annCanvas.addEventListener('touchstart', e => {
+        if (annTool === 'text') {
+            e.preventDefault();
+            const pos = getPos(e);
+            const text = prompt('Enter text:');
+            if (text && text.trim()) {
+                const fontSize = annSize * 6 + 10;
+                annCtx.font = `bold ${fontSize}px sans-serif`;
+                annCtx.fillStyle = annColor;
+                annCtx.strokeStyle = 'rgba(0,0,0,0.5)';
+                annCtx.lineWidth = 2;
+                annCtx.strokeText(text.trim(), pos.x, pos.y);
+                annCtx.fillText(text.trim(), pos.x, pos.y);
+                saveAnnotationState();
+            }
+            return;
+        }
+        e.preventDefault();
+        drawing = true;
+        lastPos = getPos(e);
+    }, { passive: false });
+
+    annCanvas.addEventListener('touchmove', e => {
+        if (!drawing || annTool !== 'pen') return;
+        e.preventDefault();
+        const pos = getPos(e);
+        annCtx.beginPath();
+        annCtx.moveTo(lastPos.x, lastPos.y);
+        annCtx.lineTo(pos.x, pos.y);
+        annCtx.strokeStyle = annColor;
+        annCtx.lineWidth = annSize;
+        annCtx.lineCap = 'round';
+        annCtx.lineJoin = 'round';
+        annCtx.stroke();
+        lastPos = pos;
+    }, { passive: false });
+
+    annCanvas.addEventListener('touchend', () => {
+        if (drawing) {
+            drawing = false;
+            saveAnnotationState();
+        }
+    });
+
+    // Mouse support for desktop testing
+    annCanvas.addEventListener('mousedown', e => {
+        if (annTool === 'text') {
+            const pos = getPos(e);
+            const text = prompt('Enter text:');
+            if (text && text.trim()) {
+                const fontSize = annSize * 6 + 10;
+                annCtx.font = `bold ${fontSize}px sans-serif`;
+                annCtx.fillStyle = annColor;
+                annCtx.strokeStyle = 'rgba(0,0,0,0.5)';
+                annCtx.lineWidth = 2;
+                annCtx.strokeText(text.trim(), pos.x, pos.y);
+                annCtx.fillText(text.trim(), pos.x, pos.y);
+                saveAnnotationState();
+            }
+            return;
+        }
+        drawing = true;
+        lastPos = getPos(e);
+    });
+
+    annCanvas.addEventListener('mousemove', e => {
+        if (!drawing || annTool !== 'pen') return;
+        const pos = getPos(e);
+        annCtx.beginPath();
+        annCtx.moveTo(lastPos.x, lastPos.y);
+        annCtx.lineTo(pos.x, pos.y);
+        annCtx.strokeStyle = annColor;
+        annCtx.lineWidth = annSize;
+        annCtx.lineCap = 'round';
+        annCtx.lineJoin = 'round';
+        annCtx.stroke();
+        lastPos = pos;
+    });
+
+    annCanvas.addEventListener('mouseup', () => {
+        if (drawing) {
+            drawing = false;
+            saveAnnotationState();
+        }
+    });
+}
+
+async function saveAnnotation(index) {
+    const photo = currentLocationPhotos[index];
+    if (!photo) return;
+    showLoadingIndicator('Saving annotation...');
+    try {
+        photo.url = annCanvas.toDataURL('image/jpeg', 0.9);
+        await savePhotoToDB(photo);
+        currentLocationPhotos = await loadLocationPhotos(selectedLocation.name);
+        hideLoadingIndicator();
+        closeAnnotationEditor();
+        if (photoViewMode) showPhotoGallery();
+    } catch (err) {
+        hideLoadingIndicator();
+        alert('Failed to save: ' + err.message);
+    }
+}
+
+function cancelAnnotation(index) {
+    closeAnnotationEditor();
+    viewFullPhoto(index);
+}
+
+function closeAnnotationEditor() {
+    const editor = document.getElementById('annotationEditor');
+    if (editor) document.body.removeChild(editor);
+    annHistory = [];
 }
 
 function initPinchZoom(img) {
@@ -1444,7 +1747,7 @@ async function exportData() {
         addressOverrides: addressOverrides,
         daysOff: daysOff,
         exportDate: new Date().toISOString(),
-        version: 'v5.0.6'
+        version: 'v5.1.0'
     };
     
     const dataStr = JSON.stringify(data, null, 2);
