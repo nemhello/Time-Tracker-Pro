@@ -39,6 +39,60 @@ function customPrompt(message, defaultValue) {
     });
 }
 
+function customConfirm(message) {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'custom-prompt-overlay';
+        overlay.innerHTML = `
+            <div class="custom-prompt-box">
+                <div class="custom-prompt-message">${escapeHtml(message)}</div>
+                <div class="custom-prompt-buttons">
+                    <button class="btn btn-secondary custom-prompt-cancel">Cancel</button>
+                    <button class="btn btn-primary custom-prompt-ok">OK</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        function finish(val) {
+            document.body.removeChild(overlay);
+            resolve(val);
+        }
+
+        overlay.querySelector('.custom-prompt-cancel').addEventListener('click', () => finish(false));
+        overlay.querySelector('.custom-prompt-ok').addEventListener('click', () => finish(true));
+        overlay.addEventListener('click', e => {
+            if (e.target === overlay) finish(false);
+        });
+    });
+}
+
+function customAlert(message) {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'custom-prompt-overlay';
+        overlay.innerHTML = `
+            <div class="custom-prompt-box">
+                <div class="custom-prompt-message" style="white-space:pre-wrap">${escapeHtml(message)}</div>
+                <div class="custom-prompt-buttons">
+                    <button class="btn btn-primary custom-prompt-ok" style="flex:1">OK</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        function finish() {
+            document.body.removeChild(overlay);
+            resolve();
+        }
+
+        overlay.querySelector('.custom-prompt-ok').addEventListener('click', finish);
+        overlay.addEventListener('click', e => {
+            if (e.target === overlay) finish();
+        });
+    });
+}
+
 // IndexedDB init
 function initPhotoDB() {
     return new Promise((resolve) => {
@@ -126,7 +180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initPhotoDB();
     if (typeof CATEGORIES === 'undefined') {
         console.error('CRITICAL: CATEGORIES not loaded!');
-        alert('ERROR: Location data failed to load. Please refresh.');
+        customAlert('ERROR: Location data failed to load. Please refresh.');
         return;
     }
 
@@ -614,7 +668,7 @@ async function handlePhotoFile(event) {
     const file = event.target.files[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-        alert('Please select an image file.');
+        customAlert('Please select an image file.');
         return;
     }
     await savePhotoLocally(file);
@@ -626,7 +680,7 @@ async function handlePhotoFiles(event) {
     if (!files.length) return;
     const images = files.filter(f => f.type.startsWith('image/'));
     if (images.length === 0) {
-        alert('Please select image files.');
+        customAlert('Please select image files.');
         event.target.value = '';
         return;
     }
@@ -651,7 +705,7 @@ async function handlePhotoFiles(event) {
     } catch (error) {
         console.error('Photo save failed:', error);
         hideLoadingIndicator();
-        alert('Photo save failed: ' + error.message);
+        customAlert('Photo save failed: ' + error.message);
     }
     event.target.value = '';
 }
@@ -689,7 +743,7 @@ async function savePhotoLocally(photoBlob) {
     } catch (error) {
         console.error('Photo save failed:', error);
         hideLoadingIndicator();
-        alert('Photo save failed: ' + error.message);
+        customAlert('Photo save failed: ' + error.message);
     }
 }
 
@@ -996,7 +1050,7 @@ async function saveAnnotation(index) {
         if (photoViewMode) showPhotoGallery();
     } catch (err) {
         hideLoadingIndicator();
-        alert('Failed to save: ' + err.message);
+        customAlert('Failed to save: ' + err.message);
     }
 }
 
@@ -1114,7 +1168,7 @@ function closePhotoViewer() {
 }
 
 async function deletePhoto(index) {
-    if (!confirm('Delete this photo?')) return;
+    if (!await customConfirm('Delete this photo?')) return;
     
     const photo = currentLocationPhotos[index];
     if (photo) await deletePhotoFromDB(photo.id);
@@ -1352,8 +1406,8 @@ function renderEntries() {
     `;
 }
 
-function deleteEntry(id) {
-    if (confirm('Delete this entry?')) {
+async function deleteEntry(id) {
+    if (await customConfirm('Delete this entry?')) {
         entries = entries.filter(e => String(e.id) !== String(id));
         saveEntries();
         renderEntries();
@@ -1387,7 +1441,7 @@ function editEntry(id) {
     const timeRegex = /^([0-1][0-9]|2[0-3]):([0-5][0-9])$/;
     
     if (!timeRegex.test(newStart) || !timeRegex.test(newEnd)) {
-        alert('Invalid time format. Use HH:MM (24-hour)\nExample: 08:30 or 14:45');
+        customAlert('Invalid time format. Use HH:MM (24-hour)\nExample: 08:30 or 14:45');
         return;
     }
     
@@ -1401,7 +1455,7 @@ function editEntry(id) {
     newEndDate.setHours(endHour, endMin, 0, 0);
     
     if (newEndDate <= newStartDate) {
-        alert('End time must be after start time');
+        customAlert('End time must be after start time');
         return;
     }
     
@@ -1594,7 +1648,7 @@ function selectDayOffType(btn) {
 function confirmDayOff() {
     const modal = document.getElementById('dayOffModal');
     const selected = document.querySelector('.day-off-type-btn.selected');
-    if (!selected) { alert('Please select an absence type.'); return; }
+    if (!selected) { customAlert('Please select an absence type.'); return; }
     const type = selected.dataset.type;
     const note = document.getElementById('dayOffNote').value.trim();
     const year = parseInt(modal.dataset.year);
@@ -1610,8 +1664,8 @@ function cancelDayOff() {
     document.getElementById('dayOffModal').classList.add('hidden');
 }
 
-function removeDayOffAndRefresh(year, month, day) {
-    if (confirm('Remove this day off?')) {
+async function removeDayOffAndRefresh(year, month, day) {
+    if (await customConfirm('Remove this day off?')) {
         removeDayOff(year, month, day);
         document.getElementById('dayOffBanner').classList.add('hidden');
         document.getElementById('pastEntriesDetail').classList.add('hidden');
@@ -1662,8 +1716,8 @@ function refreshPastEntries() {
 function editPastEntry(id) { editEntry(id); refreshPastEntries(); }
 function editPastDetails(id) { editDetails(id); refreshPastEntries(); }
 
-function deletePastEntry(id) {
-    if (confirm('Delete this entry?')) {
+async function deletePastEntry(id) {
+    if (await customConfirm('Delete this entry?')) {
         entries = entries.filter(e => String(e.id) !== String(id));
         saveEntries();
         refreshPastEntries();
@@ -1741,8 +1795,8 @@ function searchPastEntries() {
 
 function editSearchEntry(id) { editEntry(id); searchPastEntries(); }
 function editSearchDetails(id) { editDetails(id); searchPastEntries(); }
-function deleteSearchEntry(id) {
-    if (confirm('Delete this entry?')) {
+async function deleteSearchEntry(id) {
+    if (await customConfirm('Delete this entry?')) {
         entries = entries.filter(e => String(e.id) !== String(id));
         saveEntries();
         searchPastEntries();
@@ -1818,7 +1872,7 @@ async function exportData() {
         addressOverrides: addressOverrides,
         daysOff: daysOff,
         exportDate: new Date().toISOString(),
-        version: 'v5.1.2'
+        version: 'v5.1.3'
     };
     
     const dataStr = JSON.stringify(data, null, 2);
@@ -1832,7 +1886,7 @@ async function exportData() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    alert(`✅ Backup saved: ${filename}\n\nIncludes ${entries.length} entries and ${allPhotos.length} photos.`);
+    customAlert(`✅ Backup saved: ${filename}\n\nIncludes ${entries.length} entries and ${allPhotos.length} photos.`);
 }
 
 function importData() {
@@ -1852,7 +1906,7 @@ function importData() {
                 try {
                     data = JSON.parse(raw);
                 } catch (parseErr) {
-                    alert('✘ This file is not valid JSON.\n\nMake sure you selected a TimeVault backup file (.json).');
+                    customAlert('✘ This file is not valid JSON.\n\nMake sure you selected a TimeVault backup file (.json).');
                     return;
                 }
 
@@ -1876,14 +1930,14 @@ function importData() {
                     if (data.exportDate) exportInfo = `\nBackup from: ${new Date(data.exportDate).toLocaleString()}`;
                     if (data.version) exportInfo += `\nVersion: ${data.version}`;
                 } else {
-                    alert('✘ Unrecognized backup format.\n\nThis file does not contain TimeVault data.');
+                    customAlert('✘ Unrecognized backup format.\n\nThis file does not contain TimeVault data.');
                     return;
                 }
 
                 const photoCount = importPhotos.length;
                 const confirmMsg = `Import ${importEntries.length} entries and ${photoCount} photos?\n\nThis will REPLACE your current data.${exportInfo}`;
 
-                if (confirm(confirmMsg)) {
+                if (await customConfirm(confirmMsg)) {
                     entries = importEntries;
                     saveEntries();
 
@@ -1912,10 +1966,10 @@ function importData() {
                     }
 
                     renderEntries();
-                    alert(`✅ Imported ${entries.length} entries and ${photoCount} photos successfully!`);
+                    customAlert(`✅ Imported ${entries.length} entries and ${photoCount} photos successfully!`);
                 }
             } catch (err) {
-                alert('✘ Error reading backup file: ' + err.message);
+                customAlert('✘ Error reading backup file: ' + err.message);
             }
         };
         reader.readAsText(file);
@@ -2047,13 +2101,13 @@ async function loadBackup(date) {
 
 async function restoreFromBackup(date) {
     const backup = await loadBackup(date);
-    if (!backup) { alert('Backup not found.'); return; }
+    if (!backup) { customAlert('Backup not found.'); return; }
 
     const msg = `Restore backup from ${backup.date}?\n\n` +
         `${backup.entries.length} entries, ${(backup.photos || []).length} photos\n` +
         `Saved: ${new Date(backup.timestamp).toLocaleString()}\n\n` +
         `This will REPLACE your current data.`;
-    if (!confirm(msg)) return;
+    if (!await customConfirm(msg)) return;
 
     entries = backup.entries || [];
     saveEntries();
@@ -2084,11 +2138,11 @@ async function restoreFromBackup(date) {
 
     renderEntries();
     hideBackupView();
-    alert(`✅ Restored backup from ${backup.date}.\n${entries.length} entries, ${(backup.photos || []).length} photos.`);
+    customAlert(`✅ Restored backup from ${backup.date}.\n${entries.length} entries, ${(backup.photos || []).length} photos.`);
 }
 
 async function deleteBackup(date) {
-    if (!confirm(`Delete backup from ${date}?`)) return;
+    if (!await customConfirm(`Delete backup from ${date}?`)) return;
     if (!photoDB || !photoDB.objectStoreNames.contains('backups')) return;
     await new Promise(resolve => {
         const tx = photoDB.transaction('backups', 'readwrite');
@@ -2299,8 +2353,8 @@ function deleteLogEntry(id) {
     renderLocationLog();
 }
 
-function clearLocationLog() {
-    if (!confirm('Clear all location log entries?')) return;
+async function clearLocationLog() {
+    if (!await customConfirm('Clear all location log entries?')) return;
     locationLog = [];
     saveLocationLog();
     renderLocationLog();
@@ -2309,11 +2363,11 @@ function clearLocationLog() {
 function smsLocationLog() {
     const phone = document.getElementById('smsPhoneInput').value.trim();
     if (!phone) {
-        alert('Enter a phone number first.');
+        customAlert('Enter a phone number first.');
         return;
     }
     if (locationLog.length === 0) {
-        alert('No log entries to send.');
+        customAlert('No log entries to send.');
         return;
     }
 
