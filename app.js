@@ -2,6 +2,43 @@ let photoDB = null;
 let currentLocationPhotos = [], photoViewMode = false;
 let photoCountsCache = null;
 
+// Custom prompt modal (replaces browser prompt to avoid origin header)
+function customPrompt(message, defaultValue) {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'custom-prompt-overlay';
+        overlay.innerHTML = `
+            <div class="custom-prompt-box">
+                <div class="custom-prompt-message">${escapeHtml(message)}</div>
+                <input type="text" class="custom-prompt-input" id="customPromptInput" value="${escapeAttr(defaultValue || '')}">
+                <div class="custom-prompt-buttons">
+                    <button class="btn btn-secondary custom-prompt-cancel">Cancel</button>
+                    <button class="btn btn-primary custom-prompt-ok">OK</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        const input = document.getElementById('customPromptInput');
+        input.focus();
+        input.select();
+
+        function finish(val) {
+            document.body.removeChild(overlay);
+            resolve(val);
+        }
+
+        overlay.querySelector('.custom-prompt-cancel').addEventListener('click', () => finish(null));
+        overlay.querySelector('.custom-prompt-ok').addEventListener('click', () => finish(input.value));
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') finish(input.value);
+            if (e.key === 'Escape') finish(null);
+        });
+        overlay.addEventListener('click', e => {
+            if (e.target === overlay) finish(null);
+        });
+    });
+}
+
 // IndexedDB init
 function initPhotoDB() {
     return new Promise((resolve) => {
@@ -463,10 +500,10 @@ function renderLocationDetailsView() {
     `;
 }
 
-function editAddress() {
+async function editAddress() {
     if (!selectedLocation) return;
     const current = getEffectiveAddress(selectedLocation.name, selectedLocation.address);
-    const newAddr = prompt('Enter address (leave blank to remove):', current);
+    const newAddr = await customPrompt('Enter address (leave blank to remove):', current);
     if (newAddr === null) return;
     addressOverrides[selectedLocation.name] = newAddr.trim();
     saveAddressOverrides();
@@ -859,11 +896,11 @@ function setupAnnotationDrawing() {
         };
     }
 
-    annCanvas.addEventListener('touchstart', e => {
+    annCanvas.addEventListener('touchstart', async e => {
         if (annTool === 'text') {
             e.preventDefault();
             const pos = getPos(e);
-            const text = prompt('Enter text:');
+            const text = await customPrompt('Enter text:');
             if (text && text.trim()) {
                 const fontSize = annSize * 6 + 10;
                 annCtx.font = `bold ${fontSize}px sans-serif`;
@@ -904,10 +941,10 @@ function setupAnnotationDrawing() {
     });
 
     // Mouse support for desktop testing
-    annCanvas.addEventListener('mousedown', e => {
+    annCanvas.addEventListener('mousedown', async e => {
         if (annTool === 'text') {
             const pos = getPos(e);
-            const text = prompt('Enter text:');
+            const text = await customPrompt('Enter text:');
             if (text && text.trim()) {
                 const fontSize = annSize * 6 + 10;
                 annCtx.font = `bold ${fontSize}px sans-serif`;
@@ -1781,7 +1818,7 @@ async function exportData() {
         addressOverrides: addressOverrides,
         daysOff: daysOff,
         exportDate: new Date().toISOString(),
-        version: 'v5.1.1'
+        version: 'v5.1.2'
     };
     
     const dataStr = JSON.stringify(data, null, 2);
@@ -2186,7 +2223,7 @@ async function logCurrentLocation() {
                 // fall back to coords
             }
 
-            const note = prompt('What did you do here? (optional):');
+            const note = await customPrompt('What did you do here? (optional):');
 
             const entry = {
                 id: Date.now(),
