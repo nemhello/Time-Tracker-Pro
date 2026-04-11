@@ -436,7 +436,7 @@ function renderLocationDetailsView() {
     
     let addrHtml;
     if (effectiveAddress && effectiveAddress.trim() !== '') {
-        addrHtml = `<div id="detailsAddress" class="details-address" style="display:block"><div class="address-container"><a href="https://maps.apple.com/?q=${encodeURIComponent(effectiveAddress)}" target="_blank" class="address-link">&#128205; ${effectiveAddress}</a><button class="btn-edit-address" onclick="editAddress()">Edit</button></div></div>`;
+        addrHtml = `<div id="detailsAddress" class="details-address" style="display:block"><div class="address-container"><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(effectiveAddress)}" target="_blank" class="address-link">&#128205; ${effectiveAddress}</a><button class="btn-edit-address" onclick="editAddress()">Edit</button></div></div>`;
     } else {
         addrHtml = `<div id="detailsAddress" class="details-address" style="display:block"><button class="btn-add-address" onclick="editAddress()">+ Add Address</button></div>`;
     }
@@ -833,7 +833,7 @@ function showActiveTimer() {
     
     const addressLink = document.getElementById('activeAddress');
     if (activeEntry.address && activeEntry.address.trim() !== '') {
-        addressLink.href = `https://maps.apple.com/?q=${encodeURIComponent(activeEntry.address)}`;
+        addressLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeEntry.address)}`;
         addressLink.textContent = `📍 ${activeEntry.address}`;
         addressLink.style.display = 'block';
     } else {
@@ -1444,7 +1444,7 @@ async function exportData() {
         addressOverrides: addressOverrides,
         daysOff: daysOff,
         exportDate: new Date().toISOString(),
-        version: 'v5.0.5'
+        version: 'v5.0.6'
     };
     
     const dataStr = JSON.stringify(data, null, 2);
